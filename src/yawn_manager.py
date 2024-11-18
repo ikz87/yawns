@@ -4,7 +4,7 @@ from dbus_next import Variant
 import asyncio
 import sys
 
-class NotificationDaemon(ServiceInterface):
+class NotificationManager(ServiceInterface):
     def __init__(self):
         super().__init__('org.freedesktop.Notifications')
         self.notification_id = 1
@@ -27,11 +27,20 @@ class NotificationDaemon(ServiceInterface):
         else:
             notification_id = replaces_id
 
+        notif_dict = {
+            'app_name': app_name,
+            'replaces_id': replaces_id,
+            'app_icon': app_icon,
+            'summary': summary,
+            'body': body,
+            'actions': actions,
+            'hints': hints,
+            'expire_timeout': expire_timeout
+        }
+
+        self.notify_app(notif_dict)
         # Print the notification details for debugging
-        print(f"Notifying with ID {notification_id}, app_name: {app_name}, replaces_id: {replaces_id}, app_icon: {app_icon}, summary: {summary}, body: {body}, actions: {actions}, hints: {hints}, expire_timeout: {expire_timeout}")
-        
-        # Trigger the PyQt window to show the notification
-        self.show_notification_window(summary, body)
+        #print(f"Notifying with ID {notification_id}, app_name: {app_name}, replaces_id: {replaces_id}, app_icon: {app_icon}, summary: {summary}, body: {body}, actions: {actions}, hints: {hints}, expire_timeout: {expire_timeout}")
 
         return notification_id  # Return the notification ID
 
@@ -45,10 +54,12 @@ class NotificationDaemon(ServiceInterface):
         print(f"NotificationClosed emitted with ID {id}, reason {reason}")
         # No return statement needed for fire-and-forget signal
 
+    def notify_app(self, notif_dict):
+        pass
 
 async def main():
     bus = await MessageBus().connect()
-    daemon = NotificationDaemon()
+    daemon = NotificationManager()
     bus.export('/org/freedesktop/Notifications', daemon)
 
     await bus.request_name('org.freedesktop.Notifications')

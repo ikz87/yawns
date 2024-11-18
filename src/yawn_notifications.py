@@ -7,12 +7,13 @@ class BaseNotification(QWidget):
         self.setWindowFlags(Qt.X11BypassWindowManagerHint)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.notif_dict = notif_dict
-        self.setWindowTitle("yawns - Card")
+        timeout = config["general"]["timeout"]
 
 
 class CardNotification(BaseNotification):
     def __init__(self, screen, config, notif_dict, parent=None):
         super().__init__(screen, config, notif_dict, parent=parent)
+        self.setWindowTitle("yawns - Card")
         self.offset_x = int(config["card"]["x-offset"])
         self.offset_y = int(config["card"]["y-offset"])
         if int(config["card"]["x-offset"]) < 0:
@@ -23,7 +24,6 @@ class CardNotification(BaseNotification):
             self.offset_y = (screen.size().height() +
                 self.offset_y -
                 int(config["card"]["height"]))
-
         self.setGeometry(
             self.offset_x,
             self.offset_y,
