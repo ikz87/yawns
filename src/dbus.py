@@ -2,7 +2,7 @@ from dbus_next.service import ServiceInterface, method, dbus_property, signal
 from dbus_next.aio import MessageBus
 from dbus_next import Variant
 import asyncio
-
+import sys
 
 class NotificationDaemon(ServiceInterface):
     def __init__(self):
@@ -26,14 +26,14 @@ class NotificationDaemon(ServiceInterface):
             notification_id = self.notification_id
         else:
             notification_id = replaces_id
-        # Print each method argument formatted
+
+        # Print the notification details for debugging
         print(f"Notifying with ID {notification_id}, app_name: {app_name}, replaces_id: {replaces_id}, app_icon: {app_icon}, summary: {summary}, body: {body}, actions: {actions}, hints: {hints}, expire_timeout: {expire_timeout}")
-        # Implement notification logic here (e.g., show notification, play sound, etc.)
-        # Return the unique notification ID for future reference or updates to the notification
-        # Example: Return the same ID as provided in replaces_id if it's non-zero, or generate a new ID if it's zero
-        # Ensure to handle the case when the notification ID is not unique and replace any existing notifications with the same ID
-        # Returning a single integer as expected in the Notify method
-        return notification_id  # Single integer as expected
+        
+        # Trigger the PyQt window to show the notification
+        self.show_notification_window(summary, body)
+
+        return notification_id  # Return the notification ID
 
     @method()
     def CloseNotification(self, id: 'u'):
@@ -44,6 +44,7 @@ class NotificationDaemon(ServiceInterface):
     def NotificationClosed(self, id: 'u', reason: 'u'):
         print(f"NotificationClosed emitted with ID {id}, reason {reason}")
         # No return statement needed for fire-and-forget signal
+
 
 async def main():
     bus = await MessageBus().connect()
