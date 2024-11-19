@@ -1,6 +1,7 @@
 import sys
 import configparser
 import signal
+import os
 from PyQt5.QtCore import QThread, pyqtSignal, QTimer
 from PyQt5.QtWidgets import QApplication
 from yawn_notifications import CardNotification
@@ -28,7 +29,7 @@ class NotificationManagerThread(QThread):
 
     def notify_app(self, notif_dict):
         """Emit a PyQt signal when a notification is received."""
-        print(f"Received notification: {notif_dict}")
+        #print(f"Received notification: {notif_dict}")
         self.notification_received.emit(notif_dict)
 
     def run(self):
@@ -49,17 +50,23 @@ class NotificationManagerThread(QThread):
 class YawnsApp(QApplication):
     def __init__(self, appname):
         super().__init__(appname)
-        self.notifications = []
+        # Use local qss
+        self.setStyleSheet(open(PROGRAM_DIR + "/style.qss", "r").read())
+
+        # Arrays for storing notifications
+        self.card_notifications = []
 
     def show_notification(self, notif_dict):
         """Show a notification when triggered by the D-Bus signal."""
+        # First check the replace id
+        for notification in self.card_notifications:
+            if notification.notif_dict["replaces_id"] == notif_dict["replaces_id"]:
+                notification.notif_dict = notif_dict
+                notification.update_content()
+                return
         global CONFIG
-        child_window = CardNotification(self.primaryScreen(), CONFIG, notif_dict)
+        child_window = CardNotification(self, CONFIG, notif_dict)
         child_window.show()
-        timeout = CONFIG["general"]["timeout"]
-        QTimer.singleShot(int(timeout), child_window.close)
-
-        self.notifications.append(child_window)
 
 
 def handle_sigint():
@@ -72,6 +79,8 @@ def handle_sigint():
 if __name__ == '__main__':
     # Configuration
     global CONFIG
+    global PROGRAM_DIR
+    PROGRAM_DIR = os.path.dirname(os.path.abspath(sys.argv[-1]))
     CONFIG = configparser.ConfigParser()
     CONFIG.read('./config.ini')
 

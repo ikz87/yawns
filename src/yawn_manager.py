@@ -2,7 +2,6 @@ from dbus_next.service import ServiceInterface, method, dbus_property, signal
 from dbus_next.aio import MessageBus
 from dbus_next import Variant
 import asyncio
-import sys
 
 class NotificationManager(ServiceInterface):
     def __init__(self):
@@ -29,7 +28,7 @@ class NotificationManager(ServiceInterface):
 
         notif_dict = {
             'app_name': app_name,
-            'replaces_id': replaces_id,
+            'replaces_id': notification_id,
             'app_icon': app_icon,
             'summary': summary,
             'body': body,
