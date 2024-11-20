@@ -1,3 +1,4 @@
+import os
 from PyQt5.QtWidgets import QProgressBar, QHBoxLayout, QSizePolicy, QVBoxLayout, QWidget, QGridLayout, QLabel, QFrame
 from PyQt5.QtCore import QSize, Qt, QTimer
 from PyQt5.QtGui import QPixmap
@@ -98,28 +99,26 @@ class CardNotification(BaseNotification):
         self.timer.stop()
         self.timer.start()
 
+        image_path = ""
+        app_icon = ""
         if "image_path" in self.notif_dict["hints"]:
-            path = self.notif_dict["hints"]["image_path"].value.replace("file://", "")
-            pixmap = QPixmap(path)
-            if not pixmap.isNull():
-                size = int(self.config["card"]["icon-size"])
-                pixmap = pixmap.scaled(size, size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                self.icon_label.setPixmap(pixmap)
-            else:
-                self.icon_label.clear()
-
-        elif "app_icon" in self.notif_dict and self.notif_dict["app_icon"]:
-            path = self.notif_dict["app_icon"].replace("file://", "")
-            pixmap = QPixmap(path)
-            if not pixmap.isNull():
-                size = int(self.config["card"]["icon-size"])
-                pixmap = pixmap.scaled(size, size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                self.icon_label.setPixmap(pixmap)
-                self.icon_label.setMinimumSize(0,0)
-                self.icon_label.setMaximumSize(10000,10000)
-            else:
-                self.icon_label.clear()
-                self.icon_label.setFixedSize(0,0)
+            image_path = self.notif_dict["hints"]["image_path"].value.replace("file://", "")
+        if "app_icon" in self.notif_dict and self.notif_dict["app_icon"]:
+            app_icon = self.notif_dict["app_icon"].replace("file://", "")
+        image_pixmap = QPixmap(image_path)
+        app_pixmap = QPixmap(app_icon)
+        if not image_pixmap.isNull():
+            size = int(self.config["card"]["icon-size"])
+            image_pixmap = image_pixmap.scaled(size, size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            self.icon_label.setPixmap(image_pixmap)
+            self.icon_label.setMinimumSize(0,0)
+            self.icon_label.setMaximumSize(10000,10000)
+        elif not app_pixmap.isNull():
+            size = int(self.config["card"]["icon-size"])
+            app_pixmap = app_pixmap.scaled(size, size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            self.icon_label.setPixmap(app_pixmap)
+            self.icon_label.setMinimumSize(0,0)
+            self.icon_label.setMaximumSize(10000,10000)
         else:
             self.icon_label.clear()
             self.icon_label.setFixedSize(0,0)
