@@ -27,9 +27,9 @@ class NotificationManagerThread(QThread):
         await bus.request_name('org.freedesktop.Notifications')
         print("Yawns manager running...")
 
-    def notify_app(self, notif_dict):
+    def notify_app(self, notif_dict: dict):
         """Emit a PyQt signal when a notification is received."""
-        #print(f"Received notification: {notif_dict}")
+        print(f"Received notification:\n{notif_dict}")
         self.notification_received.emit(notif_dict)
 
     def run(self):
