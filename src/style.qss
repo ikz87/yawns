@@ -13,24 +13,29 @@
 #CardIcon {
     margin: 10px;
 }
+
 #CardTextContainer {
     background-color: #0F1013;
     border-radius: 10px;
     margin: 5px;
     padding: 5px;
 }
+
 #CardSummary {
     background-color: rgba(255, 255, 255, 0);
 }
+
 #CardBody {
     background-color: rgba(255, 255, 255, 0);
 }
+
 #CardBar {
     margin: 5px;
     height: 10px;
     border-radius: 5px;
     background-color: #0F1013;
 }
+
 #CardBar::chunk {
     border-radius: 5px;
     background-color: #FFE001;
