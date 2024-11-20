@@ -20,15 +20,9 @@ class NotificationManager(ServiceInterface):
     def Notify(self, app_name: 's', replaces_id: 'u', app_icon: 's', 
                summary: 's', body: 's', actions: 'as', hints: 'a{sv}', 
                expire_timeout: 'i') -> 'u':
-        if replaces_id == 0:
-            self.notification_id += 1
-            notification_id = self.notification_id
-        else:
-            notification_id = replaces_id
-
         notif_dict = {
             'app_name': app_name,
-            'replaces_id': notification_id,
+            'replaces_id': replaces_id,
             'app_icon': app_icon,
             'summary': summary,
             'body': body,
@@ -41,7 +35,7 @@ class NotificationManager(ServiceInterface):
         # Print the notification details for debugging
         #print(f"Notifying with ID {notification_id}, app_name: {app_name}, replaces_id: {replaces_id}, app_icon: {app_icon}, summary: {summary}, body: {body}, actions: {actions}, hints: {hints}, expire_timeout: {expire_timeout}")
 
-        return notification_id  # Return the notification ID
+        return replaces_id  # Return the notification ID
 
     @method()
     def CloseNotification(self, id: 'u'):

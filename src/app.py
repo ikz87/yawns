@@ -59,11 +59,12 @@ class YawnsApp(QApplication):
     def show_notification(self, notif_dict):
         """Show a notification when triggered by the D-Bus signal."""
         # First check the replace id
-        for notification in self.card_notifications:
-            if notification.notif_dict["replaces_id"] == notif_dict["replaces_id"]:
-                notification.notif_dict = notif_dict
-                notification.update_content()
-                return
+        if notif_dict["replaces_id"] != 0:
+            for notification in self.card_notifications:
+                if notification.notif_dict["replaces_id"] == notif_dict["replaces_id"]:
+                    notification.notif_dict = notif_dict
+                    notification.update_content()
+                    return
         global CONFIG
         child_window = CardNotification(self, CONFIG, notif_dict)
         child_window.show()
