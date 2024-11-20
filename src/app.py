@@ -4,8 +4,8 @@ import signal
 import os
 from PyQt5.QtCore import QThread, pyqtSignal, QTimer
 from PyQt5.QtWidgets import QApplication
-from yawn_notifications import CardNotification
-from yawn_manager import NotificationManager
+from yawns_notifications import CardNotification
+from yawns_manager import NotificationManager
 from dbus_next.aio import MessageBus
 import asyncio
 
