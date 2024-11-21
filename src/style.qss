@@ -5,40 +5,40 @@
     font-size: 16px;
 }
 
-#CardYawn {
+#CornerYawn {
     background-color: rgba(36, 39, 47, 0.9);
     border-radius: 20px;
     border: 5px solid #FFE001;
 }
 
-#CardIcon {
+#CornerYawnIcon {
     margin: 10px;
 }
 
-#CardTextContainer {
+#CornerYawnTextContainer {
     background-color: #0F1013;
     border-radius: 10px;
     margin: 5px;
     padding: 5px;
 }
 
-#CardSummary {
+#CornerYawnSummary {
     background-color: rgba(255, 255, 255, 0);
     font-weight: 700;
 }
 
-#CardBody {
+#CornerYawnBody {
     background-color: rgba(255, 255, 255, 0);
 }
 
-#CardBar {
+#CornerYawnBar {
     margin: 5px;
     height: 10px;
     border-radius: 5px;
     background-color: #0F1013;
 }
 
-#CardBar::chunk {
+#CornerYawnBar::chunk {
     border-radius: 5px;
     background-color: #FFE001;
 }
