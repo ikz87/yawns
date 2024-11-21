@@ -16,22 +16,22 @@ from Xlib.Xatom import ATOM
 class FullscreenMonitor(QThread):
     fullscreen_active = pyqtSignal(bool)
 
-    def __init__(self):
+    def __init__(self, x11_display):
         super().__init__()
+        self.display = x11_display
 
     def run(self):
-        global DISPLAY
-        root = DISPLAY.screen().root
-        screen = DISPLAY.screen()
+        root = self.display.screen().root
+        screen = self.display.screen()
 
         # Select the events you want to listen to for the root window
         root.change_attributes(event_mask=X.FocusChangeMask | X.PropertyChangeMask)
-        DISPLAY.flush()
+        self.display.flush()
 
         # Create a loop to monitor the event queue
         while True:
             # Get the next event from the X event queue
-            event = DISPLAY.next_event()
+            event = self.display.next_event()
 
             # Check for window state changes (PropertyNotify)
             if event.type == X.PropertyNotify:
@@ -52,7 +52,7 @@ class FullscreenMonitor(QThread):
                         self.fullscreen_active.emit(False)
 
             # Flush the display buffer if needed
-            DISPLAY.flush()
+            self.display.flush()
 
 
 class NotificationManagerThread(QThread):
@@ -93,8 +93,9 @@ class NotificationManagerThread(QThread):
 
 
 class YawnsApp(QApplication):
-    def __init__(self, appname):
+    def __init__(self, appname, x11_display):
         super().__init__(appname)
+        self.display = x11_display
         # Use local qss
         self.setStyleSheet(open(PROGRAM_DIR + "/style.qss", "r").read())
 
@@ -172,7 +173,8 @@ if __name__ == '__main__':
     CONFIG.read('./config.ini')
 
     # Initialize the application
-    app = YawnsApp(["yawns"])
+    x11_display = Display()
+    app = YawnsApp(["yawns"], x11_display)
     app.setQuitOnLastWindowClosed(False)
 
     # Start the NotificationManager in a QThread
@@ -181,9 +183,7 @@ if __name__ == '__main__':
     manager_thread.start()
 
     # Monitor fullscreen changes in a QThread
-    global DISPLAY
-    DISPLAY = Display()
-    fullscreen_monitor_thread = FullscreenMonitor()
+    fullscreen_monitor_thread = FullscreenMonitor(x11_display)
     fullscreen_monitor_thread.fullscreen_active.connect(app.handle_fullscreen_change)
     fullscreen_monitor_thread.start()
 

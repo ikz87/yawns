@@ -122,19 +122,19 @@ class CardYawn(BaseYawn):
         urgency = int(self.info_dict["hints"]["urgency"].value)
         if QX11Info.isPlatformX11():
             # Open the X display connection
-            dpy = Display()
+            x11_display = self.app.display
 
             # Get the window ID
             wid = int(self.winId())
-            window = dpy.create_resource_object("window", wid)
+            window = x11_display.create_resource_object("window", wid)
 
             # Get atoms for the required properties
-            WM_CLASS = dpy.intern_atom('WM_CLASS')
-            _NET_WM_STATE = dpy.intern_atom('_NET_WM_STATE')
-            _NET_WM_STATE_ABOVE = dpy.intern_atom('_NET_WM_STATE_ABOVE')
-            _NET_WM_WINDOW_TYPE = dpy.intern_atom('_NET_WM_WINDOW_TYPE')
-            _NET_WM_WINDOW_TYPE_NOTIFICATION = dpy.intern_atom('_NET_WM_WINDOW_TYPE_NOTIFICATION')
-            _NET_WM_WINDOW_TYPE_UTILITY = dpy.intern_atom('_NET_WM_WINDOW_TYPE_UTILITY')
+            WM_CLASS = x11_display.intern_atom('WM_CLASS')
+            _NET_WM_STATE = x11_display.intern_atom('_NET_WM_STATE')
+            _NET_WM_STATE_ABOVE = x11_display.intern_atom('_NET_WM_STATE_ABOVE')
+            _NET_WM_WINDOW_TYPE = x11_display.intern_atom('_NET_WM_WINDOW_TYPE')
+            _NET_WM_WINDOW_TYPE_NOTIFICATION = x11_display.intern_atom('_NET_WM_WINDOW_TYPE_NOTIFICATION')
+            _NET_WM_WINDOW_TYPE_UTILITY = x11_display.intern_atom('_NET_WM_WINDOW_TYPE_UTILITY')
 
             # Set _NET_WM_STATE to ABOVE for high urgency
             # (even though that doesn't actually work)
@@ -152,10 +152,8 @@ class CardYawn(BaseYawn):
             window.change_property(WM_CLASS, STRING, 8, b"card-yawn")
 
             # Flush the display to apply changes
-            dpy.flush()
+            x11_display.flush()
 
-            # Close the display connection
-            dpy.close()
 
     def update_content(self):
         """
