@@ -4,6 +4,10 @@ from PyQt5.QtCore import QSize, Qt, QTimer
 from PyQt5.QtGui import QPixmap
 from enum import Enum
 import time
+from PyQt5.QtX11Extras import QX11Info
+from  Xlib.display import Display
+from Xlib.Xatom import STRING, ATOM
+
 
 class YawnType(Enum):
     CARD = 1
@@ -27,7 +31,7 @@ class BaseYawn(QWidget):
     """ Base class for all notification widgets """
     def __init__(self, config, info_dict, parent=None):
         super().__init__(parent)
-        self.setWindowFlags(Qt.X11BypassWindowManagerHint)
+        #self.setWindowFlags(Qt.X11BypassWindowManagerHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.info_dict = info_dict
         timeout = int(config["general"]["timeout"])
@@ -111,7 +115,47 @@ class CardYawn(BaseYawn):
         self.upper_layout.addStretch()
         self.main_layout.addStretch()
 
+        self.setup_x11_info()
         self.update_content()
+
+    def setup_x11_info(self):
+        urgency = int(self.info_dict["hints"]["urgency"].value)
+        if QX11Info.isPlatformX11():
+            # Open the X display connection
+            dpy = Display()
+
+            # Get the window ID
+            wid = int(self.winId())
+            window = dpy.create_resource_object("window", wid)
+
+            # Get atoms for the required properties
+            WM_CLASS = dpy.intern_atom('WM_CLASS')
+            _NET_WM_STATE = dpy.intern_atom('_NET_WM_STATE')
+            _NET_WM_STATE_ABOVE = dpy.intern_atom('_NET_WM_STATE_ABOVE')
+            _NET_WM_WINDOW_TYPE = dpy.intern_atom('_NET_WM_WINDOW_TYPE')
+            _NET_WM_WINDOW_TYPE_NOTIFICATION = dpy.intern_atom('_NET_WM_WINDOW_TYPE_NOTIFICATION')
+            _NET_WM_WINDOW_TYPE_UTILITY = dpy.intern_atom('_NET_WM_WINDOW_TYPE_UTILITY')
+
+            # Set _NET_WM_STATE to ABOVE for high urgency
+            # (even though that doesn't actually work)
+            if urgency == 2:  # High urgency
+                window.change_property(_NET_WM_STATE, ATOM, 32, [_NET_WM_STATE_ABOVE])
+            else:  # Normal or low urgency
+                window.change_property(_NET_WM_STATE, ATOM, 32, [])
+
+            # Set _NET_WM_WINDOW_TYPE to both NOTIFICATION and UTILITY
+            window.change_property(_NET_WM_WINDOW_TYPE, ATOM, 32, [
+                _NET_WM_WINDOW_TYPE_NOTIFICATION, _NET_WM_WINDOW_TYPE_UTILITY
+            ])
+
+            # Set WM_CLASS
+            window.change_property(WM_CLASS, STRING, 8, b"card-yawn")
+
+            # Flush the display to apply changes
+            dpy.flush()
+
+            # Close the display connection
+            dpy.close()
 
     def update_content(self):
         """
@@ -207,7 +251,8 @@ class CardYawn(BaseYawn):
                 card_height)
             stacking_direction = -1
         for i in range(self.index):
-            offset_y += (self.app.card_yawns[i].size().height() + gap) * stacking_direction
+            if self.app.card_yawns[i].isVisible():
+                offset_y += (self.app.card_yawns[i].size().height() + gap) * stacking_direction
         self.move(offset_x, offset_y)
         if len(self.app.card_yawns) > self.index+1:
             self.app.card_yawns[self.index+1].update_position()

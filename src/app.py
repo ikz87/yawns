@@ -8,6 +8,51 @@ from yawns_notifications import YawnType, CardYawn
 from yawns_manager import NotificationManager
 from dbus_next.aio import MessageBus
 import asyncio
+from Xlib import X
+from Xlib.display import Display
+from Xlib.Xatom import ATOM
+
+
+class FullscreenMonitor(QThread):
+    fullscreen_active = pyqtSignal(bool)
+
+    def __init__(self):
+        super().__init__()
+
+    def run(self):
+        global DISPLAY
+        root = DISPLAY.screen().root
+        screen = DISPLAY.screen()
+
+        # Select the events you want to listen to for the root window
+        root.change_attributes(event_mask=X.FocusChangeMask | X.PropertyChangeMask)
+        DISPLAY.flush()
+
+        # Create a loop to monitor the event queue
+        while True:
+            # Get the next event from the X event queue
+            event = DISPLAY.next_event()
+
+            # Check for window state changes (PropertyNotify)
+            if event.type == X.PropertyNotify:
+                if event.atom == 352:
+                    num_of_fs = 0
+                    for window in root.query_tree()._data['children']:
+                        width = window.get_geometry()._data["width"]
+                        height = window.get_geometry()._data["height"]
+                                                # Check if the window is mapped (visible)
+                        # Check if the window is fullscreen
+                        if window.get_attributes().map_state != 0:
+                            if width == screen.width_in_pixels and height == screen.height_in_pixels:
+                                num_of_fs += 1
+
+                    if num_of_fs > 1:
+                        self.fullscreen_active.emit(True)
+                    else:
+                        self.fullscreen_active.emit(False)
+
+            # Flush the display buffer if needed
+            DISPLAY.flush()
 
 
 class NotificationManagerThread(QThread):
@@ -55,6 +100,23 @@ class YawnsApp(QApplication):
 
         # Arrays for storing yawns
         self.card_yawns = []
+        self.fullscreen_detected = False
+
+    def handle_fullscreen_change(self, fullscreen):
+        """
+        Hide and show yawns depending on urgency and fullscreen state
+        """
+        global CONFIG
+        self.fullscreen_detected = fullscreen
+        min_urgency = int(CONFIG["card"]["fs_urgency"])
+        for yawn in self.card_yawns:
+            urgency = int(yawn.info_dict["hints"]["urgency"].value)
+            if urgency < min_urgency and fullscreen:
+                yawn.hide()
+            else:
+                yawn.show()
+                yawn.update_position()
+
 
     def select_yawn_type(self, info_dict):
         """
@@ -86,7 +148,12 @@ class YawnsApp(QApplication):
                     return
         global CONFIG
         child_window = CardYawn(self, CONFIG, info_dict)
-        child_window.show()
+        min_urgency = int(CONFIG["card"]["fs_urgency"])
+        urgency = int(info_dict["hints"]["urgency"].value)
+        if urgency < min_urgency and self.fullscreen_detected:
+            pass
+        else:
+            child_window.show()
 
 
 def handle_sigint():
@@ -112,6 +179,13 @@ if __name__ == '__main__':
     manager_thread = NotificationManagerThread()
     manager_thread.notification_received.connect(app.select_yawn_type)
     manager_thread.start()
+
+    # Monitor fullscreen changes in a QThread
+    global DISPLAY
+    DISPLAY = Display()
+    fullscreen_monitor_thread = FullscreenMonitor()
+    fullscreen_monitor_thread.fullscreen_active.connect(app.handle_fullscreen_change)
+    fullscreen_monitor_thread.start()
 
     # Handle Ctrl+C
     signal.signal(signal.SIGINT, lambda *_: handle_sigint())
