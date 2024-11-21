@@ -4,7 +4,7 @@ import signal
 import os
 from PyQt5.QtCore import QThread, pyqtSignal, QTimer
 from PyQt5.QtWidgets import QApplication
-from yawns_notifications import YawnType, CornerYawn
+from yawns_notifications import YawnType, CornerYawn, CenterYawn
 from yawns_manager import NotificationManager
 from dbus_next.aio import MessageBus
 import asyncio
@@ -107,6 +107,7 @@ class YawnsApp(QApplication):
 
         # Arrays for storing yawns
         self.corner_yawns = []
+        self.center_yawns = []
         self.fullscreen_detected = False
 
     def handle_fullscreen_change(self, fullscreen):
@@ -132,12 +133,12 @@ class YawnsApp(QApplication):
         fallback = self.show_corner_yawn
         if "yawn_type" in info_dict["hints"]:
             yawn_type = int(info_dict["hints"]["yawn_type"].value)
-            print(f"Yawn type: {yawn_type}, {YawnType.CENTER}")
             if yawn_type == YawnType.CORNER.value:
                 print("Showing as a corner yawn")
                 self.show_corner_yawn(info_dict)
             elif yawn_type == YawnType.CENTER.value:
                 print("Showing as a center yawn")
+                self.show_center_yawn(info_dict)
             else:
                 print("Sending as fallback yawn")
                 fallback(info_dict)
@@ -156,6 +157,23 @@ class YawnsApp(QApplication):
         global CONFIG
         child_window = CornerYawn(self, CONFIG, info_dict)
         min_urgency = int(CONFIG["corner"]["fs_urgency"])
+        urgency = int(info_dict["hints"]["urgency"].value)
+        if urgency < min_urgency and self.fullscreen_detected:
+            pass
+        else:
+            child_window.show()
+
+    def show_center_yawn(self, info_dict):
+        # First check the replace id
+        if info_dict["replaces_id"] != 0:
+            for notification in self.center_yawns:
+                if notification.info_dict["replaces_id"] == info_dict["replaces_id"]:
+                    notification.info_dict = info_dict
+                    notification.update_content()
+                    return
+        global CONFIG
+        child_window = CenterYawn(self, CONFIG, info_dict)
+        min_urgency = int(CONFIG["center"]["fs_urgency"])
         urgency = int(info_dict["hints"]["urgency"].value)
         if urgency < min_urgency and self.fullscreen_detected:
             pass

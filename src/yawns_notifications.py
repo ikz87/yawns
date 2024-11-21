@@ -304,15 +304,14 @@ class CenterYawn(BaseYawn):
         self.config = config
         self.setFixedWidth(int(config["center"]["width"]))
         self.setFixedHeight(int(config["center"]["height"]))
-        self.index = len(app.corner_yawns)
-        app.corner_yawns.append(self)
+        self.index = len(app.center_yawns)
+        app.center_yawns.append(self)
 
         # Set up window
         self.setWindowTitle("yawns - Center")
-        self.setCursor(Qt.PointingHandCursor)
-        self.wm_class = "corner - yawn"
+        self.wm_class = "center - yawn"
         self.setup_widgets()
-        self.icon_label.setAlignment(Qt.AlignTop)
+        self.icon_label.setAlignment(Qt.AlignCenter)
         self.summary_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.body_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.bar.setOrientation(Qt.Horizontal)
@@ -327,7 +326,7 @@ class CenterYawn(BaseYawn):
         self.main_layout.addLayout(self.upper_layout)
 
         self.text_container = QFrame()
-        self.text_container.setObjectName("CornerYawnTextContainer")
+        self.text_container.setObjectName("CenterYawnTextContainer")
         self.text_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.text_container.setLayout(self.labels_layout)
 
@@ -424,38 +423,18 @@ class CenterYawn(BaseYawn):
         """
         Update the position of the notification based on its size and config
         """
-        offset_x = int(self.config["corner"]["x-offset"])
-        offset_y = int(self.config["corner"]["y-offset"])
-        corner_width = int(self.config["corner"]["width"])
-        corner_height = self.size().height()
-        gap = int(self.config["corner"]["gap"])
-        stacking_direction = 1
+        self_width = self.size().width()
+        self_height = self.size().height()
         screen = self.app.primaryScreen()
-        if offset_x < 0:
-            offset_x = (screen.size().width() +
-                offset_x -
-                corner_width)
-        if offset_y < 0:
-            offset_y = (screen.size().height() +
-                offset_y -
-                corner_height)
-            stacking_direction = -1
-        for i in range(self.index):
-            if self.app.corner_yawns[i].isVisible():
-                offset_y += (self.app.corner_yawns[i].size().height() + gap) * stacking_direction
+        offset_x = int((screen.size().width() - self_width)/2)
+        offset_y = int((screen.size().height() - self_height)/2)
         self.move(offset_x, offset_y)
-        if len(self.app.corner_yawns) > self.index+1:
-            self.app.corner_yawns[self.index+1].update_position()
 
     def close(self):
         """
         Close widget and update the position the one
         stacked on it (if any).
         """
-        if self in self.app.corner_yawns:
-            self.app.corner_yawns.remove(self)
-            for index in range(self.index, len(self.app.corner_yawns)):
-                self.app.corner_yawns[index].index = index
-            if len(self.app.corner_yawns) > self.index:
-                self.app.corner_yawns[self.index].update_position()
+        if self in self.app.center_yawns:
+            self.app.center_yawns.remove(self)
         super().close()
