@@ -7,6 +7,7 @@ import time
 from PyQt5.QtX11Extras import QX11Info
 from  Xlib.display import Display
 from Xlib.Xatom import STRING, ATOM
+import Xlib
 
 
 class YawnType(Enum):
@@ -55,6 +56,7 @@ class CardYawn(BaseYawn):
         self.info_dict = info_dict
         self.config = config
         self.setFixedWidth(int(config["card"]["width"]))
+        self.setMinimumHeight(int(config["card"]["height"]))
         self.index = len(app.card_yawns)
         app.card_yawns.append(self)
 
@@ -182,13 +184,13 @@ class CardYawn(BaseYawn):
             image_pixmap = image_pixmap.scaled(size, size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             self.icon_label.setPixmap(image_pixmap)
             self.icon_label.setMinimumSize(0,0)
-            self.icon_label.setMaximumSize(10000,10000)
+            self.icon_label.setMaximumSize(100000,100000)
         elif not app_pixmap.isNull():
             size = int(self.config["card"]["icon-size"])
             app_pixmap = app_pixmap.scaled(size, size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             self.icon_label.setPixmap(app_pixmap)
             self.icon_label.setMinimumSize(0,0)
-            self.icon_label.setMaximumSize(10000,10000)
+            self.icon_label.setMaximumSize(100000,100000)
         else:
             self.icon_label.clear()
             self.icon_label.setFixedSize(0,0)
@@ -196,7 +198,7 @@ class CardYawn(BaseYawn):
         if "summary" in self.info_dict and self.info_dict["summary"]:
             self.summary_label.setText(self.info_dict["summary"])
             self.summary_label.setMinimumSize(0,0)
-            self.summary_label.setMaximumSize(10000,10000)
+            self.summary_label.setMaximumSize(100000,100000)
         else:
             self.summary_label.clear()
             self.summary_label.setFixedSize(0,0)
@@ -204,7 +206,7 @@ class CardYawn(BaseYawn):
         if "body" in self.info_dict and self.info_dict["body"]:
             self.body_label.setText(self.info_dict["body"])
             self.body_label.setMinimumSize(0,0)
-            self.body_label.setMaximumSize(10000,10000)
+            self.body_label.setMaximumSize(100000,100000)
         else:
             self.body_label.clear()
             self.body_label.setFixedSize(0,0)
@@ -214,14 +216,17 @@ class CardYawn(BaseYawn):
             value = min(100,max(0,value))
             self.bar.setValue(value)
             self.bar.setMinimumSize(0,0)
-            self.bar.setMaximumSize(10000,10000)
+            self.bar.setMaximumSize(100000,100000)
         else:
             self.bar.setValue(0)
             self.bar.setFixedSize(0,0)
 
         self.main_layout.update()
         self.updateGeometry()
+        self.setMinimumHeight(0)
         self.resize(self.sizeHint())
+        if self.size().height() > int(self.config["card"]["height"]):
+            self.setFixedHeight(int(self.config["card"]["height"]))
 
         # TODO make labels wrap in between letters of words manually
         # because Qt doesn't provide that :(
