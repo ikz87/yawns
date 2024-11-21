@@ -11,6 +11,7 @@ import asyncio
 from Xlib import X
 from Xlib.display import Display
 from Xlib.Xatom import ATOM
+import Xlib
 
 
 class FullscreenMonitor(QThread):
@@ -38,13 +39,18 @@ class FullscreenMonitor(QThread):
                 if event.atom == 352:
                     num_of_fs = 0
                     for window in root.query_tree()._data['children']:
-                        width = window.get_geometry()._data["width"]
-                        height = window.get_geometry()._data["height"]
-                                                # Check if the window is mapped (visible)
-                        # Check if the window is fullscreen
-                        if window.get_attributes().map_state != 0:
-                            if width == screen.width_in_pixels and height == screen.height_in_pixels:
-                                num_of_fs += 1
+                        try:
+                            width = window.get_geometry()._data["width"]
+                            height = window.get_geometry()._data["height"]
+                            # Check if the window is mapped and fullscreen
+                            if window.get_attributes().map_state != 0:
+                                if width == screen.width_in_pixels and height == screen.height_in_pixels:
+                                    num_of_fs += 1
+                        except Xlib.error.BadDrawable as e:
+                            # Uhhhh
+                            # Ig this is a window that was destroyed?
+                            # Let's just ignore that
+                            pass
 
                     if num_of_fs > 1:
                         self.fullscreen_active.emit(True)
