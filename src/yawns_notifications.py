@@ -1,6 +1,6 @@
 import os
 from PyQt5.QtWidgets import QProgressBar, QHBoxLayout, QSizePolicy, QVBoxLayout, QWidget, QGridLayout, QLabel, QFrame
-from PyQt5.QtCore import QSize, Qt, QTimer
+from PyQt5.QtCore import QSize, Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QPixmap
 from enum import Enum
 import time
@@ -8,6 +8,7 @@ from PyQt5.QtX11Extras import QX11Info
 from  Xlib.display import Display
 from Xlib.Xatom import STRING, ATOM
 import Xlib
+import dbus
 
 
 class YawnType(Enum):
@@ -27,8 +28,46 @@ def empty_layout(layout):
                 child_widget.deleteLater()
             layout.removeItem(to_delete)
 
+def setup_x11_info(yawn):
+    urgency = int(yawn.info_dict["hints"]["urgency"].value)
+    if QX11Info.isPlatformX11():
+        # Open the X display connection
+        x11_display = yawn.app.display
+
+        # Get the window ID
+        wid = int(yawn.winId())
+        window = x11_display.create_resource_object("window", wid)
+
+        # Get atoms for the required properties
+        WM_CLASS = x11_display.intern_atom('WM_CLASS')
+        _NET_WM_STATE = x11_display.intern_atom('_NET_WM_STATE')
+        _NET_WM_STATE_ABOVE = x11_display.intern_atom('_NET_WM_STATE_ABOVE')
+        _NET_WM_WINDOW_TYPE = x11_display.intern_atom('_NET_WM_WINDOW_TYPE')
+        _NET_WM_WINDOW_TYPE_NOTIFICATION = x11_display.intern_atom('_NET_WM_WINDOW_TYPE_NOTIFICATION')
+        _NET_WM_WINDOW_TYPE_UTILITY = x11_display.intern_atom('_NET_WM_WINDOW_TYPE_UTILITY')
+
+        # Set _NET_WM_STATE to ABOVE for high urgency
+        # (even though that doesn't actually work)
+        if urgency == 2:  # High urgency
+            window.change_property(_NET_WM_STATE, ATOM, 32, [_NET_WM_STATE_ABOVE])
+        else:  # Normal or low urgency
+            window.change_property(_NET_WM_STATE, ATOM, 32, [])
+
+        # Set _NET_WM_WINDOW_TYPE to both NOTIFICATION and UTILITY
+        window.change_property(_NET_WM_WINDOW_TYPE, ATOM, 32, [
+            _NET_WM_WINDOW_TYPE_NOTIFICATION, _NET_WM_WINDOW_TYPE_UTILITY
+        ])
+
+        # Set WM_CLASS
+        window.change_property(WM_CLASS, STRING, 8, yawn.wm_class.encode("utf-8"))
+
+        # Flush the display to apply changes
+        x11_display.flush()
+
 
 class BaseYawn(QWidget):
+    yawn_activated = pyqtSignal(int)
+
     """ Base class for all notification widgets """
     def __init__(self, config, info_dict, parent=None):
         super().__init__(parent)
@@ -62,6 +101,8 @@ class CardYawn(BaseYawn):
 
         # Set up window
         self.setWindowTitle("yawns - Card")
+        self.setCursor(Qt.PointingHandCursor)
+        self.wm_class = "card - yawn"
 
         # Set up content
         # Gotta use a QFrame to fill the whole widget
@@ -118,45 +159,8 @@ class CardYawn(BaseYawn):
         self.upper_layout.addStretch()
         self.main_layout.addStretch()
 
-        self.setup_x11_info()
+        setup_x11_info(self)
         self.update_content()
-
-    def setup_x11_info(self):
-        urgency = int(self.info_dict["hints"]["urgency"].value)
-        if QX11Info.isPlatformX11():
-            # Open the X display connection
-            x11_display = self.app.display
-
-            # Get the window ID
-            wid = int(self.winId())
-            window = x11_display.create_resource_object("window", wid)
-
-            # Get atoms for the required properties
-            WM_CLASS = x11_display.intern_atom('WM_CLASS')
-            _NET_WM_STATE = x11_display.intern_atom('_NET_WM_STATE')
-            _NET_WM_STATE_ABOVE = x11_display.intern_atom('_NET_WM_STATE_ABOVE')
-            _NET_WM_WINDOW_TYPE = x11_display.intern_atom('_NET_WM_WINDOW_TYPE')
-            _NET_WM_WINDOW_TYPE_NOTIFICATION = x11_display.intern_atom('_NET_WM_WINDOW_TYPE_NOTIFICATION')
-            _NET_WM_WINDOW_TYPE_UTILITY = x11_display.intern_atom('_NET_WM_WINDOW_TYPE_UTILITY')
-
-            # Set _NET_WM_STATE to ABOVE for high urgency
-            # (even though that doesn't actually work)
-            if urgency == 2:  # High urgency
-                window.change_property(_NET_WM_STATE, ATOM, 32, [_NET_WM_STATE_ABOVE])
-            else:  # Normal or low urgency
-                window.change_property(_NET_WM_STATE, ATOM, 32, [])
-
-            # Set _NET_WM_WINDOW_TYPE to both NOTIFICATION and UTILITY
-            window.change_property(_NET_WM_WINDOW_TYPE, ATOM, 32, [
-                _NET_WM_WINDOW_TYPE_NOTIFICATION, _NET_WM_WINDOW_TYPE_UTILITY
-            ])
-
-            # Set WM_CLASS
-            window.change_property(WM_CLASS, STRING, 8, b"card-yawn")
-
-            # Flush the display to apply changes
-            x11_display.flush()
-
 
     def update_content(self):
         """
@@ -261,7 +265,6 @@ class CardYawn(BaseYawn):
         if len(self.app.card_yawns) > self.index+1:
             self.app.card_yawns[self.index+1].update_position()
 
-
     def close(self):
         """
         Close widget and update the position the one
@@ -274,3 +277,13 @@ class CardYawn(BaseYawn):
             if len(self.app.card_yawns) > self.index:
                 self.app.card_yawns[self.index].update_position()
         super().close()
+
+    def mousePressEvent(self, event):
+        # One of the buttons here should "activate" the notification
+        # But that is not working at all right now
+        if event.button() == Qt.LeftButton:
+            self.close()
+        elif event.button() == Qt.RightButton:
+            pass
+        elif event.button() == Qt.MiddleButton:
+            pass

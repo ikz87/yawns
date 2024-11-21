@@ -71,9 +71,9 @@ class NotificationManagerThread(QThread):
 
     async def setup_dbus(self):
         """Set up the D-Bus manager and bind the signal."""
-        self.manager = NotificationManager()
-        self.manager.notify_app = self.notify_app
         bus = await MessageBus().connect()
+        self.manager = NotificationManager(bus)
+        self.manager.notify_app = self.notify_app
         bus.export('/org/freedesktop/Notifications', self.manager)
         await bus.request_name('org.freedesktop.Notifications')
         print("Yawns manager running...")
