@@ -87,6 +87,7 @@ class CardYawn(BaseYawn):
         self.text_container.setLayout(self.labels_layout)
 
         self.icon_label = QLabel()
+        self.icon_label.setAlignment(Qt.AlignTop)
         self.icon_label.setObjectName("CardIcon")
 
 
