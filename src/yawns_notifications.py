@@ -23,12 +23,12 @@ def empty_layout(layout):
             layout.removeItem(to_delete)
 
 
-class BaseYawn(QFrame):
+class BaseYawn(QWidget):
     """ Base class for all notification widgets """
     def __init__(self, config, info_dict, parent=None):
         super().__init__(parent)
         self.setWindowFlags(Qt.X11BypassWindowManagerHint)
-        #self.setAttribute(Qt.WA_TranslucentBackground, True)
+        self.setAttribute(Qt.WA_TranslucentBackground)
         self.info_dict = info_dict
         timeout = int(config["general"]["timeout"])
         if "expire_timeout" in info_dict and int(info_dict["expire_timeout"]) > 0:
@@ -50,7 +50,6 @@ class CardYawn(BaseYawn):
         self.app = app
         self.info_dict = info_dict
         self.config = config
-        self.setObjectName("CardNotification")
         self.setFixedWidth(int(config["card"]["width"]))
         self.index = len(app.card_yawns)
         app.card_yawns.append(self)
@@ -59,7 +58,15 @@ class CardYawn(BaseYawn):
         self.setWindowTitle("yawns - Card")
 
         # Set up content
-        self.main_layout = QVBoxLayout(self)
+        # Gotta use a QFrame to fill the whole widget
+        # to allow bg transparency through QSS correctly
+        self.container_layout = QVBoxLayout(self)
+        self.container_layout.setContentsMargins(0,0,0,0)
+        self.main_widget = QFrame()
+        self.main_widget.setObjectName("CardYawn")
+        self.container_layout.addWidget(self.main_widget)
+
+        self.main_layout = QVBoxLayout(self.main_widget)
         self.main_layout.setSpacing(0)
         self.upper_layout = QHBoxLayout()
         self.upper_layout.setSpacing(0)
