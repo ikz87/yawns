@@ -4,7 +4,7 @@ import signal
 import os
 from PyQt5.QtCore import QThread, pyqtSignal, QTimer
 from PyQt5.QtWidgets import QApplication
-from yawns_notifications import CardNotification
+from yawns_notifications import YawnType, CardYawn
 from yawns_manager import NotificationManager
 from dbus_next.aio import MessageBus
 import asyncio
@@ -27,10 +27,10 @@ class NotificationManagerThread(QThread):
         await bus.request_name('org.freedesktop.Notifications')
         print("Yawns manager running...")
 
-    def notify_app(self, notif_dict: dict):
+    def notify_app(self, info_dict: dict):
         """Emit a PyQt signal when a notification is received."""
-        print(f"Received notification:\n{notif_dict}")
-        self.notification_received.emit(notif_dict)
+        print(f"Received notification:\n{info_dict}")
+        self.notification_received.emit(info_dict)
 
     def run(self):
         """Run the D-Bus manager in its own thread."""
@@ -53,20 +53,39 @@ class YawnsApp(QApplication):
         # Use local qss
         self.setStyleSheet(open(PROGRAM_DIR + "/style.qss", "r").read())
 
-        # Arrays for storing notifications
-        self.card_notifications = []
+        # Arrays for storing yawns
+        self.card_yawns = []
 
-    def show_notification(self, notif_dict):
-        """Show a notification when triggered by the D-Bus signal."""
+    def select_yawn_type(self, info_dict):
+        """
+        Select the yawn type based on the yawn_type hint in info dict
+        """
+        fallback = self.show_card_yawn
+        if "yawn_type" in info_dict["hints"]:
+            yawn_type = int(info_dict["hints"]["yawn_type"].value)
+            print(f"Yawn type: {yawn_type}, {YawnType.CENTER}")
+            if yawn_type == YawnType.CARD.value:
+                print("Showing as a card yawn")
+                self.show_card_yawn(info_dict)
+            elif yawn_type == YawnType.CENTER.value:
+                print("Showing as a center yawn")
+            else:
+                print("Sending as fallback yawn")
+                fallback(info_dict)
+        else:
+            print("Sending as fallback yawn")
+            fallback(info_dict)
+
+    def show_card_yawn(self, info_dict):
         # First check the replace id
-        if notif_dict["replaces_id"] != 0:
-            for notification in self.card_notifications:
-                if notification.notif_dict["replaces_id"] == notif_dict["replaces_id"]:
-                    notification.notif_dict = notif_dict
+        if info_dict["replaces_id"] != 0:
+            for notification in self.card_yawns:
+                if notification.info_dict["replaces_id"] == info_dict["replaces_id"]:
+                    notification.info_dict = info_dict
                     notification.update_content()
                     return
         global CONFIG
-        child_window = CardNotification(self, CONFIG, notif_dict)
+        child_window = CardYawn(self, CONFIG, info_dict)
         child_window.show()
 
 
@@ -91,7 +110,7 @@ if __name__ == '__main__':
 
     # Start the NotificationManager in a QThread
     manager_thread = NotificationManagerThread()
-    manager_thread.notification_received.connect(app.show_notification)
+    manager_thread.notification_received.connect(app.select_yawn_type)
     manager_thread.start()
 
     # Handle Ctrl+C

@@ -2,7 +2,12 @@ import os
 from PyQt5.QtWidgets import QProgressBar, QHBoxLayout, QSizePolicy, QVBoxLayout, QWidget, QGridLayout, QLabel, QFrame
 from PyQt5.QtCore import QSize, Qt, QTimer
 from PyQt5.QtGui import QPixmap
+from enum import Enum
 import time
+
+class YawnType(Enum):
+    CARD = 1
+    CENTER = 2
 
 def empty_layout(layout):
     # Empties a layout recursively
@@ -18,37 +23,37 @@ def empty_layout(layout):
             layout.removeItem(to_delete)
 
 
-class BaseNotification(QFrame):
+class BaseYawn(QFrame):
     """ Base class for all notification widgets """
-    def __init__(self, config, notif_dict, parent=None):
+    def __init__(self, config, info_dict, parent=None):
         super().__init__(parent)
         self.setWindowFlags(Qt.X11BypassWindowManagerHint)
         #self.setAttribute(Qt.WA_TranslucentBackground, True)
-        self.notif_dict = notif_dict
+        self.info_dict = info_dict
         timeout = int(config["general"]["timeout"])
-        if "expire_timeout" in notif_dict and int(notif_dict["expire_timeout"]) > 0:
-            timeout = int(notif_dict["expire_timeout"])
+        if "expire_timeout" in info_dict and int(info_dict["expire_timeout"]) > 0:
+            timeout = int(info_dict["expire_timeout"])
         self.timer = QTimer(self)
         self.timer.setInterval(timeout)
         self.timer.timeout.connect(self.close)
         self.timer.start()
 
 
-class CardNotification(BaseNotification):
+class CardYawn(BaseYawn):
     """
-    Card Notification, the most classic notification design.
+    The most classic notification design.
     Show a card anchored to one of the corners of your screen.
     Multiple notifications stack vertically.
     """
-    def __init__(self, app, config, notif_dict, parent=None):
-        super().__init__(config, notif_dict, parent=parent)
+    def __init__(self, app, config, info_dict, parent=None):
+        super().__init__(config, info_dict, parent=parent)
         self.app = app
-        self.notif_dict = notif_dict
+        self.info_dict = info_dict
         self.config = config
         self.setObjectName("CardNotification")
         self.setFixedWidth(int(config["card"]["width"]))
-        self.index = len(app.card_notifications)
-        app.card_notifications.append(self)
+        self.index = len(app.card_yawns)
+        app.card_yawns.append(self)
 
         # Set up window
         self.setWindowTitle("yawns - Card")
@@ -103,24 +108,24 @@ class CardNotification(BaseNotification):
 
     def update_content(self):
         """
-        Update the content of the noticiation using self.notif_dict
+        Update the content of the noticiation using self.info_dict
         """
         # Restart the timer
         self.timer.stop()
         self.timer.start()
 
         # Below, no widget gets deleted or added.
-        # if a notif_dict has less content than expected,
+        # if a info_dict has less content than expected,
         # then the empty widgets get "reset" and their
         # sizes are set to 0, 0
 
         # Handle the hint "image_path" but also use "app_icon" as a fallback icon
         image_path = ""
         app_icon = ""
-        if "image_path" in self.notif_dict["hints"]:
-            image_path = self.notif_dict["hints"]["image_path"].value.replace("file://", "")
-        if "app_icon" in self.notif_dict and self.notif_dict["app_icon"]:
-            app_icon = self.notif_dict["app_icon"].replace("file://", "")
+        if "image_path" in self.info_dict["hints"]:
+            image_path = self.info_dict["hints"]["image_path"].value.replace("file://", "")
+        if "app_icon" in self.info_dict and self.info_dict["app_icon"]:
+            app_icon = self.info_dict["app_icon"].replace("file://", "")
         image_pixmap = QPixmap(image_path)
         app_pixmap = QPixmap(app_icon)
         if not image_pixmap.isNull():
@@ -139,24 +144,24 @@ class CardNotification(BaseNotification):
             self.icon_label.clear()
             self.icon_label.setFixedSize(0,0)
 
-        if "summary" in self.notif_dict and self.notif_dict["summary"]:
-            self.summary_label.setText(self.notif_dict["summary"])
+        if "summary" in self.info_dict and self.info_dict["summary"]:
+            self.summary_label.setText(self.info_dict["summary"])
             self.summary_label.setMinimumSize(0,0)
             self.summary_label.setMaximumSize(10000,10000)
         else:
             self.summary_label.clear()
             self.summary_label.setFixedSize(0,0)
 
-        if "body" in self.notif_dict and self.notif_dict["body"]:
-            self.body_label.setText(self.notif_dict["body"])
+        if "body" in self.info_dict and self.info_dict["body"]:
+            self.body_label.setText(self.info_dict["body"])
             self.body_label.setMinimumSize(0,0)
             self.body_label.setMaximumSize(10000,10000)
         else:
             self.body_label.clear()
             self.body_label.setFixedSize(0,0)
 
-        if "value" in self.notif_dict["hints"] and self.notif_dict["hints"]["value"]:
-            value = int(self.notif_dict["hints"]["value"].value)
+        if "value" in self.info_dict["hints"] and self.info_dict["hints"]["value"]:
+            value = int(self.info_dict["hints"]["value"].value)
             value = min(100,max(0,value))
             self.bar.setValue(value)
             self.bar.setMinimumSize(0,0)
@@ -195,10 +200,10 @@ class CardNotification(BaseNotification):
                 card_height)
             stacking_direction = -1
         for i in range(self.index):
-            offset_y += (self.app.card_notifications[i].size().height() + gap) * stacking_direction
+            offset_y += (self.app.card_yawns[i].size().height() + gap) * stacking_direction
         self.move(offset_x, offset_y)
-        if len(self.app.card_notifications) > self.index+1:
-            self.app.card_notifications[self.index+1].update_position()
+        if len(self.app.card_yawns) > self.index+1:
+            self.app.card_yawns[self.index+1].update_position()
 
 
     def close(self):
@@ -206,10 +211,10 @@ class CardNotification(BaseNotification):
         Close widget and update the position the one
         stacked on it (if any).
         """
-        if self in self.app.card_notifications:
-            self.app.card_notifications.remove(self)
-            for index in range(self.index, len(self.app.card_notifications)):
-                self.app.card_notifications[index].index = index
-            if len(self.app.card_notifications) > self.index:
-                self.app.card_notifications[self.index].update_position()
+        if self in self.app.card_yawns:
+            self.app.card_yawns.remove(self)
+            for index in range(self.index, len(self.app.card_yawns)):
+                self.app.card_yawns[index].index = index
+            if len(self.app.card_yawns) > self.index:
+                self.app.card_yawns[self.index].update_position()
         super().close()
