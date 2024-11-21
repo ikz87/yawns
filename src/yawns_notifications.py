@@ -19,6 +19,7 @@ def empty_layout(layout):
 
 
 class BaseNotification(QFrame):
+    """ Base class for all notification widgets """
     def __init__(self, config, notif_dict, parent=None):
         super().__init__(parent)
         self.setWindowFlags(Qt.X11BypassWindowManagerHint)
@@ -34,6 +35,11 @@ class BaseNotification(QFrame):
 
 
 class CardNotification(BaseNotification):
+    """
+    Card Notification, the most classic notification design.
+    Show a card anchored to one of the corners of your screen.
+    Multiple notifications stack vertically.
+    """
     def __init__(self, app, config, notif_dict, parent=None):
         super().__init__(config, notif_dict, parent=parent)
         self.app = app
@@ -85,6 +91,7 @@ class CardNotification(BaseNotification):
 
         self.main_layout.addWidget(self.bar)
         self.upper_layout.addWidget(self.icon_label)
+        # We set stretch to make the label fill all the remaining space
         self.upper_layout.addWidget(self.text_container, stretch=1)
         self.labels_layout.addWidget(self.summary_label)
         self.labels_layout.addWidget(self.body_label)
@@ -95,10 +102,19 @@ class CardNotification(BaseNotification):
         self.update_content()
 
     def update_content(self):
+        """
+        Update the content of the noticiation using self.notif_dict
+        """
         # Restart the timer
         self.timer.stop()
         self.timer.start()
 
+        # Below, no widget gets deleted or added.
+        # if a notif_dict has less content than expected,
+        # then the empty widgets get "reset" and their
+        # sizes are set to 0, 0
+
+        # Handle the hint "image_path" but also use "app_icon" as a fallback icon
         image_path = ""
         app_icon = ""
         if "image_path" in self.notif_dict["hints"]:
@@ -153,11 +169,15 @@ class CardNotification(BaseNotification):
         self.updateGeometry()
         self.resize(self.sizeHint())
 
-        #TODO make labels wrap in between letters of words
+        # TODO make labels wrap in between letters of words manually
+        # because Qt doesn't provide that :(
 
         self.update_position()
 
     def update_position(self):
+        """
+        Update the position of the notification based on its size and config
+        """
         offset_x = int(self.config["card"]["x-offset"])
         offset_y = int(self.config["card"]["y-offset"])
         card_width = int(self.config["card"]["width"])
@@ -182,6 +202,10 @@ class CardNotification(BaseNotification):
 
 
     def close(self):
+        """
+        Close widget and update the position the one
+        stacked on it (if any).
+        """
         if self in self.app.card_notifications:
             self.app.card_notifications.remove(self)
             for index in range(self.index, len(self.app.card_notifications)):
