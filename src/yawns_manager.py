@@ -31,16 +31,33 @@ class NotificationManager(ServiceInterface):
                summary: 's', body: 's', actions: 'as', hints: 'a{sv}', 
                expire_timeout: 'i') -> 'u':
 
+        # Load the image asap because it gets deleted instantly 
+        image_path = ""
+        app_icon_path = ""
+        if "image_path" in hints:
+            image_path = hints["image_path"].value.replace("file://", "")
+        if app_icon:
+            app_icon_path = app_icon.replace("file://", "")
+        pixmap_data = None
+        if image_path:
+            with open(image_path, 'rb') as img_file:
+                pixmap_data = img_file.read()
+        elif app_icon_path:
+            with open(app_icon_path, 'rb') as img_file:
+                pixmap_data = img_file.read()
+
         if replaces_id == 0:
             self.notification_id += 1
             notification_id = self.notification_id
         else:
             notification_id = replaces_id
+
         notif_dict = {
             'app_name': app_name,
             'replaces_id': replaces_id,
             'notification_id': notification_id,
             'app_icon': app_icon,
+            'pixmap_data': pixmap_data,
             'summary': summary,
             'body': body,
             'actions': actions,
@@ -50,7 +67,7 @@ class NotificationManager(ServiceInterface):
         }
         self.notification_id += 1
 
-        self.activate_notification(notif_dict)
+        #self.activate_notification(notif_dict)
         self.notify_app(notif_dict)
 
         return replaces_id  # Return the notification ID
