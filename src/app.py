@@ -3,7 +3,7 @@ import configparser
 import signal
 import os
 import subprocess
-from PyQt5.QtCore import QThread, pyqtSignal, QTimer
+from PyQt5.QtCore import QThread, pyqtSignal, QTimer, Qt
 from PyQt5.QtWidgets import QApplication
 from yawns_notifications import YawnType, CornerYawn, CenterYawn
 from yawns_manager import NotificationManager
@@ -13,6 +13,7 @@ from Xlib import X
 from Xlib.display import Display
 from Xlib.Xatom import ATOM
 import Xlib
+import Xlib.threaded
 
 
 class FullscreenMonitor(QThread):
@@ -102,6 +103,7 @@ class NotificationManagerThread(QThread):
 
 class YawnsApp(QApplication):
     def __init__(self, appname, x11_display):
+        self.setAttribute(Qt.AA_X11InitThreads)
         super().__init__(appname)
         self.display = x11_display
         # Use local qss
