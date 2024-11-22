@@ -2,6 +2,7 @@ import sys
 import configparser
 import signal
 import os
+import subprocess
 from PyQt5.QtCore import QThread, pyqtSignal, QTimer
 from PyQt5.QtWidgets import QApplication
 from yawns_notifications import YawnType, CornerYawn, CenterYawn
@@ -27,7 +28,7 @@ class FullscreenMonitor(QThread):
 
         # Select the events you want to listen to for the root window
         root.change_attributes(event_mask=X.FocusChangeMask | X.PropertyChangeMask)
-        self.display.flush()
+        self.display.sync()
 
         # Create a loop to monitor the event queue
         while True:
@@ -39,6 +40,7 @@ class FullscreenMonitor(QThread):
                 if event.atom == 352:
                     num_of_fs = 0
                     for window in root.query_tree()._data['children']:
+                        self.display.sync()
                         try:
                             width = window.get_geometry()._data["width"]
                             height = window.get_geometry()._data["height"]
@@ -58,7 +60,7 @@ class FullscreenMonitor(QThread):
                         self.fullscreen_active.emit(False)
 
             # Flush the display buffer if needed
-            self.display.flush()
+            self.display.sync()
 
 
 class NotificationManagerThread(QThread):
@@ -130,6 +132,7 @@ class YawnsApp(QApplication):
         """
         Select the yawn type based on the yawn_type hint in info dict
         """
+        global CONFIG
         fallback = self.show_corner_yawn
         if "yawn_type" in info_dict["hints"]:
             yawn_type = int(info_dict["hints"]["yawn_type"].value)
@@ -146,9 +149,24 @@ class YawnsApp(QApplication):
             print("Sending as fallback yawn")
             fallback(info_dict)
 
+        # Run command after showing the yawn
+        if CONFIG["general"]["command"]:
+            command = os.path.expanduser(CONFIG["general"]["command"])
+            subprocess.call([command,
+                             info_dict["app_name"],
+                             info_dict["summary"],
+                             info_dict["body"],
+                             info_dict["app_icon"],
+                             str(info_dict["hints"]["urgency"].value),
+                             ])
+
     def show_corner_yawn(self, info_dict):
         # First check the replace id
         if info_dict["replaces_id"] != 0:
+            for notification in self.center_yawns:
+                if notification.info_dict["replaces_id"] == info_dict["replaces_id"]:
+                    notification.info_dict = info_dict
+                    notification.close()
             for notification in self.corner_yawns:
                 if notification.info_dict["replaces_id"] == info_dict["replaces_id"]:
                     notification.info_dict = info_dict
@@ -164,8 +182,11 @@ class YawnsApp(QApplication):
             child_window.show()
 
     def show_center_yawn(self, info_dict):
-        # First check the replace id
         if info_dict["replaces_id"] != 0:
+            for notification in self.corner_yawns:
+                if notification.info_dict["replaces_id"] == info_dict["replaces_id"]:
+                    notification.info_dict = info_dict
+                    notification.close()
             for notification in self.center_yawns:
                 if notification.info_dict["replaces_id"] == info_dict["replaces_id"]:
                     notification.info_dict = info_dict

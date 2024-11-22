@@ -88,6 +88,8 @@ class BaseYawn(QWidget):
             # Open the X display connection
             x11_display = self.app.display
 
+            x11_display.sync()
+
             # Get the window ID
             wid = int(self.winId())
             window = x11_display.create_resource_object("window", wid)
@@ -116,7 +118,7 @@ class BaseYawn(QWidget):
             window.change_property(WM_CLASS, STRING, 8, self.wm_class.encode("utf-8"))
 
             # Flush the display to apply changes
-            x11_display.flush()
+            x11_display.sync()
 
 
 class CornerYawn(BaseYawn):
@@ -170,6 +172,10 @@ class CornerYawn(BaseYawn):
         """
         # Restart the timer
         self.timer.stop()
+        timeout = int(self.config["general"]["timeout"])
+        if "expire_timeout" in self.info_dict and int(self.info_dict["expire_timeout"]) > 0:
+            timeout = int(self.info_dict["expire_timeout"])
+        self.timer.setInterval(timeout)
         self.timer.start()
 
         # Below, no widget gets deleted or added.
@@ -308,12 +314,13 @@ class CenterYawn(BaseYawn):
         self.setWindowTitle("yawns - Center")
         self.wm_class = "center - yawn"
         self.setup_widgets()
-        self.main_widget.setFixedWidth(int(config["center"]["width"]))
-        self.main_widget.setFixedHeight(int(config["center"]["height"]))
+        self.main_widget.setMinimumWidth(int(config["center"]["width"]))
+        self.main_widget.setMaximumHeight(int(config["center"]["height"]))
         self.icon_label.setAlignment(Qt.AlignCenter)
         self.summary_label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         self.summary_label.setAlignment(Qt.AlignCenter)
         self.body_label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+        self.body_label.setAlignment(Qt.AlignCenter)
         self.bar.setOrientation(Qt.Horizontal)
 
         self.main_layout = QVBoxLayout(self.main_widget)
@@ -337,6 +344,10 @@ class CenterYawn(BaseYawn):
         """
         # Restart the timer
         self.timer.stop()
+        timeout = int(self.config["general"]["timeout"])
+        if "expire_timeout" in self.info_dict and int(self.info_dict["expire_timeout"]) > 0:
+            timeout = int(self.info_dict["expire_timeout"])
+        self.timer.setInterval(timeout)
         self.timer.start()
 
         # Below, no widget gets deleted or added.
@@ -398,9 +409,11 @@ class CenterYawn(BaseYawn):
         self.main_layout.update()
         self.updateGeometry()
         self.resize(self.sizeHint())
+        if self.size().height() > int(self.config["center"]["height"]):
+            self.setFixedHeight(int(self.config["center"]["height"]))
 
-        # TODO make labels wrap in between letters of words manually
-        # because Qt doesn't provide that :(
+        if self.size().width() < int(self.config["center"]["width"]):
+            self.setFixedWidth(int(self.config["center"]["width"]))
 
         self.update_position()
 
@@ -414,6 +427,16 @@ class CenterYawn(BaseYawn):
         offset_x = int((screen.size().width() - self_width)/2)
         offset_y = int((screen.size().height() - self_height)/2)
         self.move(offset_x, offset_y)
+
+    def mousePressEvent(self, event):
+        # One of the buttons here should "activate" the notification
+        # But that is not working at all right now
+        if event.button() == Qt.LeftButton:
+            self.close()
+        elif event.button() == Qt.RightButton:
+            pass
+        elif event.button() == Qt.MiddleButton:
+            pass
 
     def close(self):
         """
