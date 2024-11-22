@@ -88,11 +88,11 @@ class BaseYawn(QWidget):
         yawn_class = type(self).__name__
         # Gotta use a QFrame to fill the whole widget
         # to allow bg transparency through QSS correctly
-        self.container_layout = QVBoxLayout(self)
-        self.container_layout.setContentsMargins(0,0,0,0)
+        self.main_container_layout = QVBoxLayout(self)
+        self.main_container_layout.setContentsMargins(0,0,0,0)
         self.main_widget = QFrame()
         self.main_widget.setObjectName(yawn_class)
-        self.container_layout.addWidget(self.main_widget)
+        self.main_container_layout.addWidget(self.main_widget)
 
         self.icon_label = QLabel()
         self.icon_label.setObjectName(yawn_class+"Icon")
@@ -100,16 +100,28 @@ class BaseYawn(QWidget):
         self.summary_label = QLabel()
         self.summary_label.setObjectName(yawn_class+"Summary")
         self.summary_label.setWordWrap(True)
-
         self.body_label = QLabel()
         self.body_label.setObjectName(yawn_class+"Body")
         self.body_label.setWordWrap(True)
+        self.labels_layout = QVBoxLayout()
+        self.labels_layout.setSpacing(0)
+        self.labels_layout.addWidget(self.summary_label)
+        self.labels_layout.addWidget(self.body_label)
+        self.text_container = QFrame()
+        self.text_container.setObjectName(yawn_class+"TextContainer")
+        self.text_container.setLayout(self.labels_layout)
 
+        self.bar_container = QFrame()
+        self.bar_container_layout = QVBoxLayout()
+        self.bar_container_layout.setContentsMargins(0,0,0,0)
+        self.bar_container.setLayout(self.bar_container_layout)
+        self.bar_container.setObjectName(yawn_class+"BarContainer")
         self.bar = QProgressBar()
         self.bar.setObjectName(yawn_class+"Bar")
         self.bar.setTextVisible(False)
         self.bar.setMaximum(100)
         self.bar.setMinimum(0)
+        self.bar_container_layout.addWidget(self.bar)
 
 
 class CornerYawn(BaseYawn):
@@ -137,27 +149,19 @@ class CornerYawn(BaseYawn):
         self.summary_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.body_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.bar.setOrientation(Qt.Horizontal)
+        self.text_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         self.main_layout = QVBoxLayout(self.main_widget)
         self.main_layout.setSpacing(0)
         self.upper_layout = QHBoxLayout()
         self.upper_layout.setSpacing(0)
-        self.labels_layout = QVBoxLayout()
-        self.labels_layout.setSpacing(0)
         self.main_layout.addStretch()
         self.main_layout.addLayout(self.upper_layout)
 
-        self.text_container = QFrame()
-        self.text_container.setObjectName("CornerYawnTextContainer")
-        self.text_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.text_container.setLayout(self.labels_layout)
-
-        self.main_layout.addWidget(self.bar)
+        self.main_layout.addWidget(self.bar_container)
         self.upper_layout.addWidget(self.icon_label)
         # We set stretch to make the label fill all the remaining space
         self.upper_layout.addWidget(self.text_container, stretch=1)
-        self.labels_layout.addWidget(self.summary_label)
-        self.labels_layout.addWidget(self.body_label)
 
         self.upper_layout.addStretch()
         self.main_layout.addStretch()
@@ -302,8 +306,6 @@ class CenterYawn(BaseYawn):
         self.app = app
         self.info_dict = info_dict
         self.config = config
-        self.setFixedWidth(int(config["center"]["width"]))
-        self.setFixedHeight(int(config["center"]["height"]))
         self.index = len(app.center_yawns)
         app.center_yawns.append(self)
 
@@ -311,33 +313,24 @@ class CenterYawn(BaseYawn):
         self.setWindowTitle("yawns - Center")
         self.wm_class = "center - yawn"
         self.setup_widgets()
+        self.main_widget.setFixedWidth(int(config["center"]["width"]))
+        self.main_widget.setFixedHeight(int(config["center"]["height"]))
         self.icon_label.setAlignment(Qt.AlignCenter)
-        self.summary_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self.body_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.summary_label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+        self.summary_label.setAlignment(Qt.AlignCenter)
+        self.body_label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         self.bar.setOrientation(Qt.Horizontal)
 
         self.main_layout = QVBoxLayout(self.main_widget)
         self.main_layout.setSpacing(0)
         self.upper_layout = QHBoxLayout()
         self.upper_layout.setSpacing(0)
-        self.labels_layout = QVBoxLayout()
-        self.labels_layout.setSpacing(0)
+
+
         self.main_layout.addStretch()
-        self.main_layout.addLayout(self.upper_layout)
-
-        self.text_container = QFrame()
-        self.text_container.setObjectName("CenterYawnTextContainer")
-        self.text_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.text_container.setLayout(self.labels_layout)
-
-        self.main_layout.addWidget(self.bar)
-        self.upper_layout.addWidget(self.icon_label)
-        # We set stretch to make the label fill all the remaining space
-        self.upper_layout.addWidget(self.text_container, stretch=1)
-        self.labels_layout.addWidget(self.summary_label)
-        self.labels_layout.addWidget(self.body_label)
-
-        self.upper_layout.addStretch()
+        self.main_layout.addWidget(self.icon_label, stretch=1)
+        self.main_layout.addWidget(self.text_container, stretch=0)
+        self.main_layout.addWidget(self.bar_container)
         self.main_layout.addStretch()
 
         setup_x11_info(self)
@@ -409,10 +402,7 @@ class CenterYawn(BaseYawn):
 
         self.main_layout.update()
         self.updateGeometry()
-        self.setMinimumHeight(0)
         self.resize(self.sizeHint())
-        if self.size().height() > int(self.config["corner"]["height"]):
-            self.setFixedHeight(int(self.config["corner"]["height"]))
 
         # TODO make labels wrap in between letters of words manually
         # because Qt doesn't provide that :(

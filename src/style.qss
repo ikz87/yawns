@@ -18,8 +18,8 @@
 #CornerYawnTextContainer {
     background-color: #0F1013;
     border-radius: 10px;
-    margin: 5px;
-    padding: 5px;
+    margin: 3px;
+    padding: 3px;
 }
 
 #CornerYawnSummary {
@@ -27,18 +27,66 @@
     font-weight: 700;
 }
 
-#CornerYawnBody {
-    background-color: rgba(255, 255, 255, 0);
+#CornerYawnBarContainer {
+    margin: 3px;
+    margin-top: 6px;
+    max-height: 20px;
+    border-radius: 10px;
+    background-color: #0F1013;
 }
 
 #CornerYawnBar {
-    margin: 5px;
-    height: 10px;
-    border-radius: 5px;
+    margin: 6.5px;
     background-color: #0F1013;
 }
 
 #CornerYawnBar::chunk {
-    border-radius: 5px;
+    width: 1px;
+    border-radius: 8px;
+    background-color: #FFE001;
+}
+
+#CenterYawn {
+    background-color: rgba(36, 39, 47, 0.9);
+    border-radius: 20px;
+    border: 5px solid #FFE001;
+}
+
+#CenterYawnIcon {
+    margin: 10px;
+}
+
+#CenterYawnTextContainer {
+    background-color: #0F1013;
+    border-radius: 10px;
+    margin: 3px;
+    padding: 2px;
+}
+
+#CenterYawnSummary {
+    background-color: rgba(255, 255, 255, 0);
+    font-weight: 700;
+}
+
+#CenterYawnBody {
+    background-color: rgba(255, 255, 255, 0);
+}
+
+#CenterYawnBarContainer {
+    margin: 3px;
+    margin-top: 6px;
+    max-height: 20px;
+    border-radius: 10px;
+    background-color: #0F1013;
+}
+
+#CenterYawnBar {
+    margin: 6.5px;
+    background-color: #0F1013;
+}
+
+#CenterYawnBar::chunk {
+    width: 1px;
+    border-radius: 8px;
     background-color: #FFE001;
 }
