@@ -27,22 +27,17 @@
     font-weight: 700;
 }
 
-#CornerYawnBarContainer {
-    margin: 3px;
-    margin-top: 6px;
-    max-height: 20px;
-    border-radius: 10px;
-    background-color: #0F1013;
-}
-
 #CornerYawnBar {
-    margin: 6.5px;
+    height: 5px;
+    margin: 3px;
+    border-radius: 10px;
+    margin-top: 6px;
+    padding: 7.5px;
     background-color: #0F1013;
 }
 
 #CornerYawnBar::chunk {
     width: 1px;
-    border-radius: 8px;
     background-color: #FFE001;
 }
 
@@ -72,21 +67,16 @@
     background-color: rgba(255, 255, 255, 0);
 }
 
-#CenterYawnBarContainer {
-    margin: 3px;
-    margin-top: 6px;
-    max-height: 20px;
-    border-radius: 10px;
-    background-color: #0F1013;
-}
-
 #CenterYawnBar {
-    margin: 6.5px;
+    height: 5px;
+    margin: 3px;
+    border-radius: 10px;
+    margin-top: 6px;
+    padding: 7.5px;
     background-color: #0F1013;
 }
 
 #CenterYawnBar::chunk {
     width: 1px;
-    border-radius: 8px;
     background-color: #FFE001;
 }

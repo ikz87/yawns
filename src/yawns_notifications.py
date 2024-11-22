@@ -28,41 +28,6 @@ def empty_layout(layout):
                 child_widget.deleteLater()
             layout.removeItem(to_delete)
 
-def setup_x11_info(yawn):
-    urgency = int(yawn.info_dict["hints"]["urgency"].value)
-    if QX11Info.isPlatformX11():
-        # Open the X display connection
-        x11_display = yawn.app.display
-
-        # Get the window ID
-        wid = int(yawn.winId())
-        window = x11_display.create_resource_object("window", wid)
-
-        # Get atoms for the required properties
-        WM_CLASS = x11_display.intern_atom('WM_CLASS')
-        _NET_WM_STATE = x11_display.intern_atom('_NET_WM_STATE')
-        _NET_WM_STATE_ABOVE = x11_display.intern_atom('_NET_WM_STATE_ABOVE')
-        _NET_WM_WINDOW_TYPE = x11_display.intern_atom('_NET_WM_WINDOW_TYPE')
-        _NET_WM_WINDOW_TYPE_NOTIFICATION = x11_display.intern_atom('_NET_WM_WINDOW_TYPE_NOTIFICATION')
-        _NET_WM_WINDOW_TYPE_UTILITY = x11_display.intern_atom('_NET_WM_WINDOW_TYPE_UTILITY')
-
-        # Set _NET_WM_STATE to ABOVE for high urgency
-        # (even though that doesn't actually work)
-        if urgency == 2:  # High urgency
-            window.change_property(_NET_WM_STATE, ATOM, 32, [_NET_WM_STATE_ABOVE])
-        else:  # Normal or low urgency
-            window.change_property(_NET_WM_STATE, ATOM, 32, [])
-
-        # Set _NET_WM_WINDOW_TYPE to both NOTIFICATION and UTILITY
-        window.change_property(_NET_WM_WINDOW_TYPE, ATOM, 32, [
-            _NET_WM_WINDOW_TYPE_NOTIFICATION, _NET_WM_WINDOW_TYPE_UTILITY
-        ])
-
-        # Set WM_CLASS
-        window.change_property(WM_CLASS, STRING, 8, yawn.wm_class.encode("utf-8"))
-
-        # Flush the display to apply changes
-        x11_display.flush()
 
 
 class BaseYawn(QWidget):
@@ -111,17 +76,47 @@ class BaseYawn(QWidget):
         self.text_container.setObjectName(yawn_class+"TextContainer")
         self.text_container.setLayout(self.labels_layout)
 
-        self.bar_container = QFrame()
-        self.bar_container_layout = QVBoxLayout()
-        self.bar_container_layout.setContentsMargins(0,0,0,0)
-        self.bar_container.setLayout(self.bar_container_layout)
-        self.bar_container.setObjectName(yawn_class+"BarContainer")
         self.bar = QProgressBar()
         self.bar.setObjectName(yawn_class+"Bar")
         self.bar.setTextVisible(False)
         self.bar.setMaximum(100)
         self.bar.setMinimum(0)
-        self.bar_container_layout.addWidget(self.bar)
+
+    def setup_x11_info(self):
+        urgency = int(self.info_dict["hints"]["urgency"].value)
+        if QX11Info.isPlatformX11():
+            # Open the X display connection
+            x11_display = self.app.display
+
+            # Get the window ID
+            wid = int(self.winId())
+            window = x11_display.create_resource_object("window", wid)
+
+            # Get atoms for the required properties
+            WM_CLASS = x11_display.intern_atom('WM_CLASS')
+            _NET_WM_STATE = x11_display.intern_atom('_NET_WM_STATE')
+            _NET_WM_STATE_ABOVE = x11_display.intern_atom('_NET_WM_STATE_ABOVE')
+            _NET_WM_WINDOW_TYPE = x11_display.intern_atom('_NET_WM_WINDOW_TYPE')
+            _NET_WM_WINDOW_TYPE_NOTIFICATION = x11_display.intern_atom('_NET_WM_WINDOW_TYPE_NOTIFICATION')
+            _NET_WM_WINDOW_TYPE_UTILITY = x11_display.intern_atom('_NET_WM_WINDOW_TYPE_UTILITY')
+
+            # Set _NET_WM_STATE to ABOVE for high urgency
+            # (even though that doesn't actually work)
+            if urgency == 2:  # High urgency
+                window.change_property(_NET_WM_STATE, ATOM, 32, [_NET_WM_STATE_ABOVE])
+            else:  # Normal or low urgency
+                window.change_property(_NET_WM_STATE, ATOM, 32, [])
+
+            # Set _NET_WM_WINDOW_TYPE to both NOTIFICATION and UTILITY
+            window.change_property(_NET_WM_WINDOW_TYPE, ATOM, 32, [
+                _NET_WM_WINDOW_TYPE_NOTIFICATION, _NET_WM_WINDOW_TYPE_UTILITY
+            ])
+
+            # Set WM_CLASS
+            window.change_property(WM_CLASS, STRING, 8, self.wm_class.encode("utf-8"))
+
+            # Flush the display to apply changes
+            x11_display.flush()
 
 
 class CornerYawn(BaseYawn):
@@ -146,8 +141,8 @@ class CornerYawn(BaseYawn):
         self.wm_class = "corner - yawn"
         self.setup_widgets()
         self.icon_label.setAlignment(Qt.AlignTop)
-        self.summary_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self.body_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.summary_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.body_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.bar.setOrientation(Qt.Horizontal)
         self.text_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
@@ -158,7 +153,7 @@ class CornerYawn(BaseYawn):
         self.main_layout.addStretch()
         self.main_layout.addLayout(self.upper_layout)
 
-        self.main_layout.addWidget(self.bar_container)
+        self.main_layout.addWidget(self.bar)
         self.upper_layout.addWidget(self.icon_label)
         # We set stretch to make the label fill all the remaining space
         self.upper_layout.addWidget(self.text_container, stretch=1)
@@ -166,7 +161,7 @@ class CornerYawn(BaseYawn):
         self.upper_layout.addStretch()
         self.main_layout.addStretch()
 
-        setup_x11_info(self)
+        self.setup_x11_info()
         self.update_content()
 
     def update_content(self):
@@ -330,10 +325,10 @@ class CenterYawn(BaseYawn):
         self.main_layout.addStretch()
         self.main_layout.addWidget(self.icon_label, stretch=1)
         self.main_layout.addWidget(self.text_container, stretch=0)
-        self.main_layout.addWidget(self.bar_container)
+        self.main_layout.addWidget(self.bar)
         self.main_layout.addStretch()
 
-        setup_x11_info(self)
+        self.setup_x11_info()
         self.update_content()
 
     def update_content(self):
@@ -422,8 +417,7 @@ class CenterYawn(BaseYawn):
 
     def close(self):
         """
-        Close widget and update the position the one
-        stacked on it (if any).
+        Close widget
         """
         if self in self.app.center_yawns:
             self.app.center_yawns.remove(self)
