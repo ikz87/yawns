@@ -31,25 +31,23 @@ def empty_layout(layout):
 
 
 class BaseYawn(QWidget):
+    """ Base class for all notification widgets """
+
     yawn_activated = pyqtSignal(int)
 
-    """ Base class for all notification widgets """
-    def __init__(self, config, info_dict, parent=None):
+    def __init__(self, app, config, info_dict, parent=None):
         super().__init__(parent)
-        #self.setWindowFlags(Qt.X11BypassWindowManagerHint)
-        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.app = app
+        self.config = config
         self.info_dict = info_dict
-
-        # Start timeout
-        timeout = int(config["general"]["timeout"])
-        if "expire_timeout" in info_dict and int(info_dict["expire_timeout"]) > 0:
-            timeout = int(info_dict["expire_timeout"])
+        self.setAttribute(Qt.WA_TranslucentBackground)
         self.timer = QTimer(self)
-        self.timer.setInterval(timeout)
         self.timer.timeout.connect(self.close)
-        self.timer.start()
 
     def setup_widgets(self):
+        """
+        Setup the widgets for the yawn
+        """
         yawn_class = type(self).__name__
         # Gotta use a QFrame to fill the whole widget
         # to allow bg transparency through QSS correctly
@@ -82,7 +80,82 @@ class BaseYawn(QWidget):
         self.bar.setMaximum(100)
         self.bar.setMinimum(0)
 
+
+    def update_content(self):
+        """
+        Update the content of the yawn using its info_dict
+        """
+        # Start/Restart the timer
+        if self.timer.isActive():
+            self.timer.stop()
+        timeout = int(self.config["timeout"])
+        if "expire_timeout" in self.info_dict and int(self.info_dict["expire_timeout"]) > 0:
+            timeout = int(self.info_dict["expire_timeout"])
+        self.timer.setInterval(timeout)
+        self.timer.start()
+
+        # Below, no widget gets deleted or added.
+        # if a info_dict has less content than expected,
+        # then the empty widgets get "reset" and their
+        # sizes are set to 0, 0
+        if self.info_dict["hints"].get("icon_data", None):
+            image_pixmap = QPixmap()
+            if image_pixmap.loadFromData(self.info_dict["hints"]["icon_data"]):
+                size = int(self.config["icon-size"])
+                image_pixmap = image_pixmap.scaled(size, size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                self.icon_label.setPixmap(image_pixmap)
+                self.icon_label.setMinimumSize(0,0)
+                self.icon_label.setMaximumSize(100000,100000)
+            else:
+                self.icon_label.clear()
+                self.icon_label.setFixedSize(0,0)
+        else:
+            self.icon_label.clear()
+            self.icon_label.setFixedSize(0,0)
+
+        if "summary" in self.info_dict and self.info_dict["summary"]:
+            self.summary_label.setText(self.info_dict["summary"])
+            self.summary_label.setMinimumSize(0,0)
+            self.summary_label.setMaximumSize(100000,100000)
+        else:
+            self.summary_label.clear()
+            self.summary_label.setFixedSize(0,0)
+
+        if "body" in self.info_dict and self.info_dict["body"]:
+            self.body_label.setText(self.info_dict["body"])
+            self.body_label.setMinimumSize(0,0)
+            self.body_label.setMaximumSize(100000,100000)
+        else:
+            self.body_label.clear()
+            self.body_label.setFixedSize(0,0)
+
+        if "value" in self.info_dict["hints"] and self.info_dict["hints"]["value"]:
+            value = int(self.info_dict["hints"]["value"].value)
+            value = min(100,max(0,value))
+            self.bar.setValue(value)
+            self.bar.setMinimumSize(0,0)
+            self.bar.setMaximumSize(100000,100000)
+        else:
+            self.bar.setValue(0)
+            self.bar.setFixedSize(0,0)
+
+        self.main_layout.update()
+        self.updateGeometry()
+        self.setMinimumHeight(0)
+        self.resize(self.sizeHint())
+        # TODO make labels wrap in between letters of words manually
+        # because Qt doesn't provide that :(
+
+        self.update_position()
+
+    def update_position(self):
+        pass
+
     def setup_x11_info(self):
+        """
+        Set up X11 properties for the window,
+        based on the urgency of the noticiation.
+        """
         urgency = int(self.info_dict["hints"]["urgency"].value)
         if QX11Info.isPlatformX11():
             # Open the X display connection
@@ -121,6 +194,21 @@ class BaseYawn(QWidget):
             x11_display.sync()
 
 
+    def mousePressEvent(self, a0):
+        """
+        Handle mouse clicks on the notification
+        """
+        # One of the buttons here should "activate" the notification
+        # But that is not working at all right now
+        super().mousePressEvent(a0)
+        if a0.button() == Qt.LeftButton:
+            self.close()
+        elif a0.button() == Qt.RightButton:
+            pass
+        elif a0.button() == Qt.MiddleButton:
+            pass
+
+
 class CornerYawn(BaseYawn):
     """
     The most classic notification design.
@@ -128,12 +216,9 @@ class CornerYawn(BaseYawn):
     Multiple notifications stack vertically.
     """
     def __init__(self, app, config, info_dict, parent=None):
-        super().__init__(config, info_dict, parent=parent)
-        self.app = app
-        self.info_dict = info_dict
-        self.config = config
-        self.setFixedWidth(int(config["corner"]["width"]))
-        self.setMinimumHeight(int(config["corner"]["height"]))
+        super().__init__(app, config["corner"], info_dict, parent=parent)
+        self.setFixedWidth(int(self.config["width"]))
+        self.setMinimumHeight(int(self.config["height"]))
         self.index = len(app.corner_yawns)
         app.corner_yawns.append(self)
 
@@ -166,95 +251,15 @@ class CornerYawn(BaseYawn):
         self.setup_x11_info()
         self.update_content()
 
-    def update_content(self):
-        """
-        Update the content of the noticiation using self.info_dict
-        """
-        # Restart the timer
-        self.timer.stop()
-        timeout = int(self.config["general"]["timeout"])
-        if "expire_timeout" in self.info_dict and int(self.info_dict["expire_timeout"]) > 0:
-            timeout = int(self.info_dict["expire_timeout"])
-        self.timer.setInterval(timeout)
-        self.timer.start()
-
-        # Below, no widget gets deleted or added.
-        # if a info_dict has less content than expected,
-        # then the empty widgets get "reset" and their
-        # sizes are set to 0, 0
-
-        # Handle the hint "image_path" but also use "app_icon" as a fallback icon
-        image_path = ""
-        app_icon = ""
-        if "image_path" in self.info_dict["hints"]:
-            image_path = self.info_dict["hints"]["image_path"].value.replace("file://", "")
-        if "app_icon" in self.info_dict and self.info_dict["app_icon"]:
-            app_icon = self.info_dict["app_icon"].replace("file://", "")
-        image_pixmap = QPixmap(image_path)
-        app_pixmap = QPixmap(app_icon)
-        if not image_pixmap.isNull():
-            size = int(self.config["corner"]["icon-size"])
-            image_pixmap = image_pixmap.scaled(size, size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-            self.icon_label.setPixmap(image_pixmap)
-            self.icon_label.setMinimumSize(0,0)
-            self.icon_label.setMaximumSize(100000,100000)
-        elif not app_pixmap.isNull():
-            size = int(self.config["corner"]["icon-size"])
-            app_pixmap = app_pixmap.scaled(size, size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-            self.icon_label.setPixmap(app_pixmap)
-            self.icon_label.setMinimumSize(0,0)
-            self.icon_label.setMaximumSize(100000,100000)
-        else:
-            self.icon_label.clear()
-            self.icon_label.setFixedSize(0,0)
-
-        if "summary" in self.info_dict and self.info_dict["summary"]:
-            self.summary_label.setText(self.info_dict["summary"])
-            self.summary_label.setMinimumSize(0,0)
-            self.summary_label.setMaximumSize(100000,100000)
-        else:
-            self.summary_label.clear()
-            self.summary_label.setFixedSize(0,0)
-
-        if "body" in self.info_dict and self.info_dict["body"]:
-            self.body_label.setText(self.info_dict["body"])
-            self.body_label.setMinimumSize(0,0)
-            self.body_label.setMaximumSize(100000,100000)
-        else:
-            self.body_label.clear()
-            self.body_label.setFixedSize(0,0)
-
-        if "value" in self.info_dict["hints"] and self.info_dict["hints"]["value"]:
-            value = int(self.info_dict["hints"]["value"].value)
-            value = min(100,max(0,value))
-            self.bar.setValue(value)
-            self.bar.setMinimumSize(0,0)
-            self.bar.setMaximumSize(100000,100000)
-        else:
-            self.bar.setValue(0)
-            self.bar.setFixedSize(0,0)
-
-        self.main_layout.update()
-        self.updateGeometry()
-        self.setMinimumHeight(0)
-        self.resize(self.sizeHint())
-        if self.size().height() > int(self.config["corner"]["height"]):
-            self.setFixedHeight(int(self.config["corner"]["height"]))
-
-        # TODO make labels wrap in between letters of words manually
-        # because Qt doesn't provide that :(
-
-        self.update_position()
-
     def update_position(self):
         """
         Update the position of the notification based on its size and config
         """
-        offset_x = int(self.config["corner"]["x-offset"])
-        offset_y = int(self.config["corner"]["y-offset"])
-        corner_width = int(self.config["corner"]["width"])
+        offset_x = int(self.config["x-offset"])
+        offset_y = int(self.config["y-offset"])
+        corner_width = int(self.config["width"])
         corner_height = self.size().height()
-        gap = int(self.config["corner"]["gap"])
+        gap = int(self.config["gap"])
         stacking_direction = 1
         screen = self.app.primaryScreen()
         if offset_x < 0:
@@ -284,17 +289,9 @@ class CornerYawn(BaseYawn):
                 self.app.corner_yawns[index].index = index
             if len(self.app.corner_yawns) > self.index:
                 self.app.corner_yawns[self.index].update_position()
-        super().close()
+        return super().close()
 
-    def mousePressEvent(self, event):
-        # One of the buttons here should "activate" the notification
-        # But that is not working at all right now
-        if event.button() == Qt.LeftButton:
-            self.close()
-        elif event.button() == Qt.RightButton:
-            pass
-        elif event.button() == Qt.MiddleButton:
-            pass
+
 class CenterYawn(BaseYawn):
     """
     Show a notification in the center of the screen
@@ -303,10 +300,8 @@ class CenterYawn(BaseYawn):
     volume, brightness or keyboard layout.
     """
     def __init__(self, app, config, info_dict, parent=None):
-        super().__init__(config, info_dict, parent=parent)
-        self.app = app
-        self.info_dict = info_dict
-        self.config = config
+        super().__init__(app, config["center"], info_dict, parent=parent)
+
         self.index = len(app.center_yawns)
         app.center_yawns.append(self)
 
@@ -314,8 +309,9 @@ class CenterYawn(BaseYawn):
         self.setWindowTitle("yawns - Center")
         self.wm_class = "center - yawn"
         self.setup_widgets()
-        self.main_widget.setMinimumWidth(int(config["center"]["width"]))
-        self.main_widget.setMaximumHeight(int(config["center"]["height"]))
+
+        self.main_widget.setMinimumWidth(int(self.config["width"]))
+        self.main_widget.setMaximumHeight(int(self.config["height"]))
         self.icon_label.setAlignment(Qt.AlignCenter)
         self.summary_label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         self.summary_label.setAlignment(Qt.AlignCenter)
@@ -328,94 +324,12 @@ class CenterYawn(BaseYawn):
         self.upper_layout = QHBoxLayout()
         self.upper_layout.setSpacing(0)
 
-
-        self.main_layout.addStretch()
         self.main_layout.addWidget(self.icon_label, stretch=1)
         self.main_layout.addWidget(self.text_container, stretch=0)
         self.main_layout.addWidget(self.bar)
-        self.main_layout.addStretch()
 
         self.setup_x11_info()
         self.update_content()
-
-    def update_content(self):
-        """
-        Update the content of the noticiation using self.info_dict
-        """
-        # Restart the timer
-        self.timer.stop()
-        timeout = int(self.config["general"]["timeout"])
-        if "expire_timeout" in self.info_dict and int(self.info_dict["expire_timeout"]) > 0:
-            timeout = int(self.info_dict["expire_timeout"])
-        self.timer.setInterval(timeout)
-        self.timer.start()
-
-        # Below, no widget gets deleted or added.
-        # if a info_dict has less content than expected,
-        # then the empty widgets get "reset" and their
-        # sizes are set to 0, 0
-
-        # Handle the hint "image_path" but also use "app_icon" as a fallback icon
-        image_path = ""
-        app_icon = ""
-        if "image_path" in self.info_dict["hints"]:
-            image_path = self.info_dict["hints"]["image_path"].value.replace("file://", "")
-        if "app_icon" in self.info_dict and self.info_dict["app_icon"]:
-            app_icon = self.info_dict["app_icon"].replace("file://", "")
-        image_pixmap = QPixmap(image_path)
-        app_pixmap = QPixmap(app_icon)
-        if not image_pixmap.isNull():
-            size = int(self.config["corner"]["icon-size"])
-            image_pixmap = image_pixmap.scaled(size, size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-            self.icon_label.setPixmap(image_pixmap)
-            self.icon_label.setMinimumSize(0,0)
-            self.icon_label.setMaximumSize(100000,100000)
-        elif not app_pixmap.isNull():
-            size = int(self.config["corner"]["icon-size"])
-            app_pixmap = app_pixmap.scaled(size, size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-            self.icon_label.setPixmap(app_pixmap)
-            self.icon_label.setMinimumSize(0,0)
-            self.icon_label.setMaximumSize(100000,100000)
-        else:
-            self.icon_label.clear()
-            self.icon_label.setFixedSize(0,0)
-
-        if "summary" in self.info_dict and self.info_dict["summary"]:
-            self.summary_label.setText(self.info_dict["summary"])
-            self.summary_label.setMinimumSize(0,0)
-            self.summary_label.setMaximumSize(100000,100000)
-        else:
-            self.summary_label.clear()
-            self.summary_label.setFixedSize(0,0)
-
-        if "body" in self.info_dict and self.info_dict["body"]:
-            self.body_label.setText(self.info_dict["body"])
-            self.body_label.setMinimumSize(0,0)
-            self.body_label.setMaximumSize(100000,100000)
-        else:
-            self.body_label.clear()
-            self.body_label.setFixedSize(0,0)
-
-        if "value" in self.info_dict["hints"] and self.info_dict["hints"]["value"]:
-            value = int(self.info_dict["hints"]["value"].value)
-            value = min(100,max(0,value))
-            self.bar.setValue(value)
-            self.bar.setMinimumSize(0,0)
-            self.bar.setMaximumSize(100000,100000)
-        else:
-            self.bar.setValue(0)
-            self.bar.setFixedSize(0,0)
-
-        self.main_layout.update()
-        self.updateGeometry()
-        self.resize(self.sizeHint())
-        if self.size().height() > int(self.config["center"]["height"]):
-            self.setFixedHeight(int(self.config["center"]["height"]))
-
-        if self.size().width() < int(self.config["center"]["width"]):
-            self.setFixedWidth(int(self.config["center"]["width"]))
-
-        self.update_position()
 
     def update_position(self):
         """
@@ -428,20 +342,10 @@ class CenterYawn(BaseYawn):
         offset_y = int((screen.size().height() - self_height)/2)
         self.move(offset_x, offset_y)
 
-    def mousePressEvent(self, event):
-        # One of the buttons here should "activate" the notification
-        # But that is not working at all right now
-        if event.button() == Qt.LeftButton:
-            self.close()
-        elif event.button() == Qt.RightButton:
-            pass
-        elif event.button() == Qt.MiddleButton:
-            pass
-
     def close(self):
         """
         Close widget
         """
         if self in self.app.center_yawns:
             self.app.center_yawns.remove(self)
-        super().close()
+        return super().close()
