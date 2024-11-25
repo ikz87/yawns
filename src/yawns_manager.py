@@ -12,7 +12,7 @@ class NotificationManager(ServiceInterface):
         super().__init__('org.freedesktop.Notifications')
         self.notification_id = 0
         self.bus = bus
-        self.current_sender = None
+        self.current_sender = ""
 
         def handle_message(message: Message):
             """Handle incoming D-Bus messages and log the sender."""
@@ -89,13 +89,13 @@ class NotificationManager(ServiceInterface):
         # I don't even know if this will get used
         # but in theory the sender should be able to close
         # the notification by accessing this method
-        self.close_notification(None,id=id)
+        self.close_notification(id, 3, self.current_sender)
 
 
     def notify_app(self, info_dict):
         pass
 
-    def close_notification(self, notification, id=None, reason=0):
+    def close_notification(self, id, reason, sender_id):
         pass
 
     def activate_notification(self, info_dict: dict):

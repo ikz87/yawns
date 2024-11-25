@@ -43,7 +43,7 @@ class BaseYawn(QWidget):
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.timer = QTimer(self)
         self.timer.setSingleShot(True)
-        self.timer.timeout.connect(lambda: self.app.notification_closed.emit(self))
+        self.timer.timeout.connect(lambda: self.app.request_notification_closing.emit(self.info_dict["notification_id"], 1, self.info_dict["sender_id"]))
 
     def setup_widgets(self):
         """
@@ -202,10 +202,10 @@ class BaseYawn(QWidget):
         # But that is not working at all right now
         super().mousePressEvent(a0)
         if a0.button() == Qt.LeftButton:
-            self.app.notification_activated.emit(self.info_dict)
-            self.app.notification_closed.emit(self)
+            self.app.request_notification_activation.emit(self.info_dict)
+            self.app.request_notification_closing.emit(self.info_dict["notification_id"], 1, self.info_dict["sender_id"])
         elif a0.button() == Qt.RightButton:
-            self.app.notification_closed.emit(self)
+            self.app.request_notification_closing.emit(self.info_dict["notification_id"], 1, self.info_dict["sender_id"])
         elif a0.button() == Qt.MiddleButton:
             pass
 

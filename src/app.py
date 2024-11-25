@@ -68,6 +68,7 @@ class FullscreenMonitor(QThread):
 
 class NotificationManagerThread(QThread):
     notification_received = pyqtSignal(dict)
+    notification_closed = pyqtSignal(int)
 
     def __init__(self):
         super().__init__()
@@ -92,33 +93,18 @@ class NotificationManagerThread(QThread):
         #print(f"Received notification:\n{filtered_dict}")
         self.notification_received.emit(info_dict)
 
-    def close_notification(self, notification, id=None, reason=2):
-        message = None
-        if notification:
-            notification.close()
-            id = notification.info_dict["notification_id"]
-            sender_id = notification.info_dict["sender_id"]
-            message = Message(
-                destination=sender_id,
-                message_type=MessageType.SIGNAL, # Signal type
-                signature="uu",
-                interface='org.freedesktop.Notifications',
-                path='/org/freedesktop/Notifications',
-                member='NotificationClosed',
-                body=[int(id), int(reason)]
-            )
-        else:
-            sender_id = "0"
-            message = Message(
-                destination=sender_id,
-                message_type=MessageType.SIGNAL, # Signal type
-                signature="uu",
-                interface='org.freedesktop.Notifications',
-                path='/org/freedesktop/Notifications',
-                member='NotificationClosed',
-                body=[int(id), int(reason)]
-            )
+    def close_notification(self, id, reason, sender_id):
+        message = Message(
+            destination=sender_id,
+            message_type=MessageType.SIGNAL, # Signal type
+            signature="uu",
+            interface='org.freedesktop.Notifications',
+            path='/org/freedesktop/Notifications',
+            member='NotificationClosed',
+            body=[int(id), int(reason)]
+        )
         self.bus.send(message)
+        self.notification_closed.emit(id)
 
     def activate_notification(self, info_dict: dict):
         # This doesn't actually work and I have no idea why
@@ -159,8 +145,8 @@ class NotificationManagerThread(QThread):
 
 
 class YawnsApp(QApplication):
-    notification_closed = pyqtSignal(BaseYawn)
-    notification_activated = pyqtSignal(dict)
+    request_notification_closing = pyqtSignal(int, int, str)
+    request_notification_activation = pyqtSignal(dict)
 
     def __init__(self, appname, x11_display):
         self.setAttribute(Qt.AA_X11InitThreads)
@@ -264,6 +250,19 @@ class YawnsApp(QApplication):
             child_window.show()
 
 
+
+    def close_notification(self, notification_id):
+        """
+        Close the notification with the given ID
+        """
+        for notification in self.corner_yawns:
+            if notification.info_dict["notification_id"] == notification_id:
+                notification.close()
+                return
+        for notification in self.center_yawns:
+            if notification.info_dict["notification_id"] == notification_id:
+                notification.close()
+                return
 def handle_sigint():
     """Handle Ctrl+C to gracefully exit."""
     print("\nCtrl+C pressed. Exiting...")
@@ -286,9 +285,16 @@ if __name__ == '__main__':
 
     # Start the NotificationManager in a QThread
     manager_thread = NotificationManagerThread()
+
+    # This is cumbersome, but we have to connect signals this way
+    # because all notification closing should also be handled by the
+    # manager primarily
     manager_thread.notification_received.connect(app.select_yawn_type)
-    app.notification_closed.connect(manager_thread.close_notification)
-    app.notification_activated.connect(manager_thread.activate_notification)
+
+    app.request_notification_closing.connect(manager_thread.close_notification)
+    app.request_notification_activation.connect(manager_thread.activate_notification)
+
+    manager_thread.notification_closed.connect(app.close_notification)
     manager_thread.start()
 
     # Monitor fullscreen changes in a QThread
