@@ -92,7 +92,7 @@ class NotificationManagerThread(QThread):
         #print(f"Received notification:\n{filtered_dict}")
         self.notification_received.emit(info_dict)
 
-    def close_notification(self, notification, id=None, reason=0):
+    def close_notification(self, notification, id=None, reason=2):
         message = None
         if notification:
             notification.close()

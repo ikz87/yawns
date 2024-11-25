@@ -64,7 +64,6 @@ class NotificationManager(ServiceInterface):
             hints["icon_data"] = None
 
         if replaces_id == 0:
-            self.notification_id += 1
             notification_id = self.notification_id
         else:
             notification_id = replaces_id
@@ -83,12 +82,12 @@ class NotificationManager(ServiceInterface):
             'expire_timeout': expire_timeout,
             'sender_id': self.current_sender
         }
-        self.notification_id += 1
 
         #self.activate_notification(info_dict)
         self.notify_app(info_dict)
 
-        return replaces_id  # Return the notification ID
+        self.notification_id += 1  # Increment the notification ID for next time
+        return notification_id  # Return the notification ID
 
     @method()
     def CloseNotification(self, id: 'u'):

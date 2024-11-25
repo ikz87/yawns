@@ -42,6 +42,7 @@ class BaseYawn(QWidget):
         self.info_dict = info_dict
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.timer = QTimer(self)
+        self.timer.setSingleShot(True)
         self.timer.timeout.connect(lambda: self.app.notification_closed.emit(self))
 
     def setup_widgets(self):
@@ -173,7 +174,6 @@ class BaseYawn(QWidget):
             _NET_WM_STATE_ABOVE = x11_display.intern_atom('_NET_WM_STATE_ABOVE')
             _NET_WM_WINDOW_TYPE = x11_display.intern_atom('_NET_WM_WINDOW_TYPE')
             _NET_WM_WINDOW_TYPE_NOTIFICATION = x11_display.intern_atom('_NET_WM_WINDOW_TYPE_NOTIFICATION')
-            _NET_WM_WINDOW_TYPE_UTILITY = x11_display.intern_atom('_NET_WM_WINDOW_TYPE_UTILITY')
 
             # Set _NET_WM_STATE to ABOVE for high urgency
             # (even though that doesn't actually work)
@@ -184,7 +184,7 @@ class BaseYawn(QWidget):
 
             # Set _NET_WM_WINDOW_TYPE to both NOTIFICATION and UTILITY
             window.change_property(_NET_WM_WINDOW_TYPE, ATOM, 32, [
-                _NET_WM_WINDOW_TYPE_NOTIFICATION, _NET_WM_WINDOW_TYPE_UTILITY
+                _NET_WM_WINDOW_TYPE_NOTIFICATION
             ])
 
             # Set WM_CLASS
