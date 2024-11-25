@@ -272,24 +272,25 @@ class CornerYawn(BaseYawn):
                 offset_y -
                 corner_height)
             stacking_direction = -1
-        for i in range(self.index):
+        for i in range(len(self.app.corner_yawns) - self.index - 1):
             if self.app.corner_yawns[i].isVisible():
                 offset_y += (self.app.corner_yawns[i].size().height() + gap) * stacking_direction
         self.move(offset_x, offset_y)
-        if len(self.app.corner_yawns) > self.index+1:
-            self.app.corner_yawns[self.index+1].update_position()
+        if self.index > 0:
+            self.app.corner_yawns[self.index-1].update_position()
 
     def close(self):
         """
         Close widget and update the position the one
         stacked on it (if any).
         """
+        print(f"closing {self.index}")
         if self in self.app.corner_yawns:
             self.app.corner_yawns.remove(self)
             for index in range(self.index, len(self.app.corner_yawns)):
                 self.app.corner_yawns[index].index = index
-            if len(self.app.corner_yawns) > self.index:
-                self.app.corner_yawns[self.index].update_position()
+            if self.index > 0:
+                self.app.corner_yawns[self.index-1].update_position()
         return super().close()
 
 
