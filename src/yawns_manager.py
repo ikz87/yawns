@@ -63,11 +63,6 @@ class NotificationManager(ServiceInterface):
         else:
             hints["icon_data"] = None
 
-        if replaces_id == 0:
-            notification_id = self.notification_id
-        else:
-            notification_id = replaces_id
-
         print(type(hints["icon_data"]))
 
         info_dict = {
@@ -87,13 +82,15 @@ class NotificationManager(ServiceInterface):
         self.notify_app(info_dict)
 
         self.notification_id += 1  # Increment the notification ID for next time
+        # For some reason, we have to return the incremented id
+        # Returning notification_id - 1 does not work
         return notification_id  # Return the notification ID
 
     @method()
     def CloseNotification(self, id: 'u'):
         # I don't even know if this will get used
         # but in theory the sender should be able to close
-        # the notification by sending a signal
+        # the notification by accessing this method
         self.close_notification(None,id=id)
 
 
