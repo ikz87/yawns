@@ -10,7 +10,7 @@ from yawns_notifications import BaseYawn
 class NotificationManager(ServiceInterface):
     def __init__(self, bus):
         super().__init__('org.freedesktop.Notifications')
-        self.notification_id = 1
+        self.notification_id = 0
         self.bus = bus
         self.current_sender = None
 
@@ -65,10 +65,11 @@ class NotificationManager(ServiceInterface):
 
         print(type(hints["icon_data"]))
 
+        self.notification_id += 1
         info_dict = {
             'app_name': app_name,
             'replaces_id': replaces_id,
-            'notification_id': notification_id,
+            'notification_id': self.notification_id,
             'app_icon': app_icon,
             'summary': summary,
             'body': body,
@@ -81,10 +82,7 @@ class NotificationManager(ServiceInterface):
         #self.activate_notification(info_dict)
         self.notify_app(info_dict)
 
-        self.notification_id += 1  # Increment the notification ID for next time
-        # For some reason, we have to return the incremented id
-        # Returning notification_id - 1 does not work
-        return notification_id  # Return the notification ID
+        return self.notification_id  # Return the notification ID
 
     @method()
     def CloseNotification(self, id: 'u'):
