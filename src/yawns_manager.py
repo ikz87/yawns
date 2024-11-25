@@ -5,6 +5,8 @@ from dbus_next.aio import MessageBus
 from dbus_next.message import Message
 import asyncio
 
+from yawns_notifications import BaseYawn
+
 class NotificationManager(ServiceInterface):
     def __init__(self, bus):
         super().__init__('org.freedesktop.Notifications')
@@ -38,13 +40,28 @@ class NotificationManager(ServiceInterface):
             image_path = hints["image_path"].value.replace("file://", "")
         if app_icon:
             app_icon_path = app_icon.replace("file://", "")
-        pixmap_data = None
-        if image_path:
+        icon_data = None
+        if "icon_data" in hints:
+            icon_data = hints["icon_data"].value
+            if type(icon_data) == list:
+                for i in icon_data:
+                    print(type(i))
+                    if type(i) == bytes:
+                        hints["icon_data"] = i
+                        break
+            elif type(icon_data) == bytes:
+                hints["icon_data"] = icon_data
+
+        elif image_path:
             with open(image_path, 'rb') as img_file:
-                pixmap_data = img_file.read()
+                icon_data = img_file.read()
+                hints["icon_data"] = icon_data
         elif app_icon_path:
             with open(app_icon_path, 'rb') as img_file:
-                pixmap_data = img_file.read()
+                icon_data = img_file.read()
+                hints["icon_data"] = icon_data
+        else:
+            hints["icon_data"] = None
 
         if replaces_id == 0:
             self.notification_id += 1
@@ -52,12 +69,13 @@ class NotificationManager(ServiceInterface):
         else:
             notification_id = replaces_id
 
-        notif_dict = {
+        print(type(hints["icon_data"]))
+
+        info_dict = {
             'app_name': app_name,
             'replaces_id': replaces_id,
             'notification_id': notification_id,
             'app_icon': app_icon,
-            'pixmap_data': pixmap_data,
             'summary': summary,
             'body': body,
             'actions': actions,
@@ -67,55 +85,27 @@ class NotificationManager(ServiceInterface):
         }
         self.notification_id += 1
 
-        #self.activate_notification(notif_dict)
-        self.notify_app(notif_dict)
+        #self.activate_notification(info_dict)
+        self.notify_app(info_dict)
 
         return replaces_id  # Return the notification ID
 
     @method()
     def CloseNotification(self, id: 'u'):
-        self.NotificationClosed(id, 2)
+        # I don't even know if this will get used
+        # but in theory the sender should be able to close
+        # the notification by sending a signal
+        self.close_notification(None,id=id)
 
-    @signal()
-    def NotificationClosed(self, id: 'u', reason: 'u'):
+
+    def notify_app(self, info_dict):
         pass
 
-    def activate_notification(self, notif_dict):
-        # This doesn't actually work and I have no idea why
-        # TODO: Fix this, I guess :(
-        actions = notif_dict.get('actions', [])
-        if actions and len(actions) > 1:
-            action_key = actions[0]
-            message = Message(
-                destination=notif_dict["sender_id"],
-                message_type=MessageType.SIGNAL, # Signal type
-                signature="us",
-                interface='org.freedesktop.Notifications',
-                path='/org/freedesktop/Notifications',
-                member='ActionInvoked',
-                body=[notif_dict["notification_id"], action_key]
-            )
-            self.bus.send(message)
-            message = Message(
-                destination=notif_dict["sender_id"],
-                message_type=MessageType.SIGNAL, # Signal type
-                signature="uu",
-                interface='org.freedesktop.Notifications',
-                path='/org/freedesktop/Notifications',
-                member='NotificationClosed',
-                body=[notif_dict["notification_id"], 2]
-            )
-            self.bus.send(message)
-            # ^ I'm just copying what dunst does.
-            # Not sure if they do something else behind the scenes
-            # but this doesn't work for me
-        else:
-            print("No actions available to invoke.")
-            return
-
-    def notify_app(self, notif_dict):
+    def close_notification(self, notification, id=None, reason=0):
         pass
 
+    def activate_notification(self, info_dict: dict):
+        pass
 
 async def main():
     bus = await MessageBus().connect()

@@ -5,9 +5,11 @@ import os
 import subprocess
 from PyQt5.QtCore import QThread, pyqtSignal, QTimer, Qt
 from PyQt5.QtWidgets import QApplication
-from yawns_notifications import YawnType, CornerYawn, CenterYawn
+from dbus_next.constants import MessageType
+from yawns_notifications import BaseYawn, YawnType, CornerYawn, CenterYawn
 from yawns_manager import NotificationManager
 from dbus_next.aio import MessageBus
+from dbus_next.message import Message
 import asyncio
 from Xlib import X
 from Xlib.display import Display
@@ -71,20 +73,75 @@ class NotificationManagerThread(QThread):
         super().__init__()
         self.loop = asyncio.new_event_loop()
         self.manager = None
+        self.bus = None
 
     async def setup_dbus(self):
         """Set up the D-Bus manager and bind the signal."""
-        bus = await MessageBus().connect()
-        self.manager = NotificationManager(bus)
+        self.bus = await MessageBus().connect()
+        self.manager = NotificationManager(self.bus)
         self.manager.notify_app = self.notify_app
-        bus.export('/org/freedesktop/Notifications', self.manager)
-        await bus.request_name('org.freedesktop.Notifications')
+        self.manager.close_notification = self.close_notification
+        self.manager.activate_notification = self.activate_notification
+        self.bus.export('/org/freedesktop/Notifications', self.manager)
+        await self.bus.request_name('org.freedesktop.Notifications')
         print("Yawns manager running...")
 
     def notify_app(self, info_dict: dict):
         """Emit a PyQt signal when a notification is received."""
-        print(f"Received notification:\n{info_dict}")
+        filtered_dict = {k:v for k,v in info_dict.items() if k != "pixmap_data"}
+        #print(f"Received notification:\n{filtered_dict}")
         self.notification_received.emit(info_dict)
+
+    def close_notification(self, notification, id=None, reason=0):
+        message = None
+        if notification:
+            notification.close()
+            id = notification.info_dict["notification_id"]
+            sender_id = notification.info_dict["sender_id"]
+            message = Message(
+                destination=sender_id,
+                message_type=MessageType.SIGNAL, # Signal type
+                signature="uu",
+                interface='org.freedesktop.Notifications',
+                path='/org/freedesktop/Notifications',
+                member='NotificationClosed',
+                body=[int(id), int(reason)]
+            )
+        else:
+            sender_id = "0"
+            message = Message(
+                destination=sender_id,
+                message_type=MessageType.SIGNAL, # Signal type
+                signature="uu",
+                interface='org.freedesktop.Notifications',
+                path='/org/freedesktop/Notifications',
+                member='NotificationClosed',
+                body=[int(id), int(reason)]
+            )
+        self.bus.send(message)
+
+    def activate_notification(self, info_dict: dict):
+        # This doesn't actually work and I have no idea why
+        # TODO: Fix this, I guess :(
+        actions = info_dict.get('actions', [])
+        if actions and len(actions) > 1:
+            action_key = actions[0]
+            message = Message(
+                destination=info_dict["sender_id"],
+                message_type=MessageType.SIGNAL, # Signal type
+                signature="us",
+                interface='org.freedesktop.Notifications',
+                path='/org/freedesktop/Notifications',
+                member='ActionInvoked',
+                body=[info_dict["notification_id"], action_key]
+            )
+            self.bus.send(message)
+            # ^ I'm just copying what dunst does.
+            # Not sure if they do something else behind the scenes
+            # but this doesn't work for me
+        else:
+            print("No actions available to invoke.")
+            return
 
     def run(self):
         """Run the D-Bus manager in its own thread."""
@@ -102,6 +159,9 @@ class NotificationManagerThread(QThread):
 
 
 class YawnsApp(QApplication):
+    notification_closed = pyqtSignal(BaseYawn)
+    notification_activated = pyqtSignal(dict)
+
     def __init__(self, appname, x11_display):
         self.setAttribute(Qt.AA_X11InitThreads)
         super().__init__(appname)
@@ -227,6 +287,8 @@ if __name__ == '__main__':
     # Start the NotificationManager in a QThread
     manager_thread = NotificationManagerThread()
     manager_thread.notification_received.connect(app.select_yawn_type)
+    app.notification_closed.connect(manager_thread.close_notification)
+    app.notification_activated.connect(manager_thread.activate_notification)
     manager_thread.start()
 
     # Monitor fullscreen changes in a QThread
