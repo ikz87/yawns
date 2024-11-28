@@ -1,5 +1,6 @@
 import os
-from PyQt5.QtWidgets import QProgressBar, QHBoxLayout, QSizePolicy, QVBoxLayout, QWidget, QGridLayout, QLabel, QFrame
+import cssutils
+from PyQt5.QtWidgets import QProgressBar, QHBoxLayout, QSizePolicy, QVBoxLayout, QWidget, QGridLayout, QLabel, QFrame, QStyle
 from PyQt5.QtCore import QSize, Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QPixmap
 from enum import Enum
@@ -54,6 +55,7 @@ class BaseYawn(QWidget):
         # to allow bg transparency through QSS correctly
         self.main_container_layout = QVBoxLayout(self)
         self.main_container_layout.setContentsMargins(0,0,0,0)
+        self.main_container_layout.setSpacing(0)
         self.main_widget = QFrame()
         self.main_widget.setObjectName(yawn_class)
         self.main_container_layout.addWidget(self.main_widget)
@@ -68,6 +70,7 @@ class BaseYawn(QWidget):
         self.body_label.setObjectName(yawn_class+"Body")
         self.body_label.setWordWrap(True)
         self.labels_layout = QVBoxLayout()
+        self.labels_layout.setContentsMargins(0,0,0,0)
         self.labels_layout.setSpacing(0)
         self.labels_layout.addWidget(self.summary_label)
         self.labels_layout.addWidget(self.body_label)
@@ -82,10 +85,7 @@ class BaseYawn(QWidget):
         self.bar.setMinimum(0)
 
 
-    def update_content(self):
-        """
-        Update the content of the yawn using its info_dict
-        """
+    def restart_timer(self):
         # Start/Restart the timer
         if self.timer.isActive():
             self.timer.stop()
@@ -95,15 +95,13 @@ class BaseYawn(QWidget):
         self.timer.setInterval(timeout)
         self.timer.start()
 
-        # Below, no widget gets deleted or added.
-        # if a info_dict has less content than expected,
-        # then the empty widgets get "reset" and their
-        # sizes are set to 0, 0
+    def update_icon(self):
+        self.icon_size = 0
         if self.info_dict["hints"].get("icon_data", None):
             image_pixmap = QPixmap()
             if image_pixmap.loadFromData(self.info_dict["hints"]["icon_data"]):
-                size = int(self.config["icon-size"])
-                image_pixmap = image_pixmap.scaled(size, size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                self.icon_size = int(self.config["icon-size"])
+                image_pixmap = image_pixmap.scaled(self.icon_size, self.icon_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 self.icon_label.setPixmap(image_pixmap)
                 self.icon_label.setMinimumSize(0,0)
                 self.icon_label.setMaximumSize(100000,100000)
@@ -114,8 +112,10 @@ class BaseYawn(QWidget):
             self.icon_label.clear()
             self.icon_label.setFixedSize(0,0)
 
+    def update_text(self):
         if "summary" in self.info_dict and self.info_dict["summary"]:
-            self.summary_label.setText(self.info_dict["summary"])
+            text = self.info_dict["summary"].replace("\n", "<br>")
+            self.summary_label.setText("<span style=\"text-decoration: none;\">"+text+"</span>")
             self.summary_label.setMinimumSize(0,0)
             self.summary_label.setMaximumSize(100000,100000)
         else:
@@ -123,13 +123,15 @@ class BaseYawn(QWidget):
             self.summary_label.setFixedSize(0,0)
 
         if "body" in self.info_dict and self.info_dict["body"]:
-            self.body_label.setText(self.info_dict["body"])
+            text = self.info_dict["body"].replace("\n", "<br>")
+            self.body_label.setText("<span style=\"text-decoration: none;\">"+text+"</span>")
             self.body_label.setMinimumSize(0,0)
             self.body_label.setMaximumSize(100000,100000)
         else:
             self.body_label.clear()
             self.body_label.setFixedSize(0,0)
 
+    def update_bar(self):
         if "value" in self.info_dict["hints"] and self.info_dict["hints"]["value"]:
             value = int(self.info_dict["hints"]["value"].value)
             value = min(100,max(0,value))
@@ -140,16 +142,28 @@ class BaseYawn(QWidget):
             self.bar.setValue(0)
             self.bar.setFixedSize(0,0)
 
-        self.main_layout.update()
-        self.updateGeometry()
-        self.setMinimumHeight(0)
-        self.resize(self.sizeHint())
-        # TODO make labels wrap in between letters of words manually
-        # because Qt doesn't provide that :(
+    def update_content(self):
+        """
+        Update the content of the yawn using its info_dict
+        """
+        self.restart_timer()
 
+        # Below, no widget gets deleted or added.
+        # if a info_dict has less content than expected,
+        # then the empty widgets get "reset" and their
+        # sizes are set to 0, 0
+        self.update_icon()
+        self.update_text()
+        self.update_bar()
+
+    def show(self):
         self.update_position()
+        super().show()
 
     def update_position(self):
+        self.main_layout.update()
+        self.updateGeometry()
+        self.adjustSize()
         pass
 
     def setup_x11_info(self):
@@ -219,7 +233,7 @@ class CornerYawn(BaseYawn):
     def __init__(self, app, config, info_dict, parent=None):
         super().__init__(app, config["corner"], info_dict, parent=parent)
         self.setFixedWidth(int(self.config["width"]))
-        self.setMinimumHeight(int(self.config["height"]))
+        self.setMaximumHeight(int(self.config["height"]))
         self.index = len(app.corner_yawns)
         app.corner_yawns.append(self)
 
@@ -235,14 +249,22 @@ class CornerYawn(BaseYawn):
         self.text_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         self.main_layout = QVBoxLayout(self.main_widget)
+        self.main_layout.setContentsMargins(0,0,0,0)
         self.main_layout.setSpacing(0)
         self.upper_layout = QHBoxLayout()
+        self.upper_layout.setContentsMargins(0,0,0,0)
         self.upper_layout.setSpacing(0)
         self.main_layout.addStretch()
         self.main_layout.addLayout(self.upper_layout)
 
+        self.icon_layout = QVBoxLayout()
+        self.icon_layout.setContentsMargins(0,0,0,0)
+        self.icon_layout.setSpacing(0)
+        self.icon_layout.addWidget(self.icon_label)
+        self.icon_layout.addStretch()
+
         self.main_layout.addWidget(self.bar)
-        self.upper_layout.addWidget(self.icon_label)
+        self.upper_layout.addLayout(self.icon_layout)
         # We set stretch to make the label fill all the remaining space
         self.upper_layout.addWidget(self.text_container, stretch=1)
 
@@ -252,14 +274,97 @@ class CornerYawn(BaseYawn):
         self.setup_x11_info()
         self.update_content()
 
+    def update_content(self):
+        self.restart_timer()
+        self.update_icon()
+        # We gotta manually calculate how much space the 
+        # text container should take up in the layout
+        # because Qt kinda sucks and I'm starting to
+        # realize it
+
+        # Parse the application stylesheet
+        stylesheet = cssutils.parseString(self.app.stylesheet)
+
+        # Helper function to expand shorthand properties
+        def expand_shorthand(styles, property_name):
+            if property_name in styles:
+                values = styles[property_name].split()
+                if len(values) == 1:  # All sides same
+                    styles.update({f"{property_name}-top": values[0],
+                                   f"{property_name}-right": values[0],
+                                   f"{property_name}-bottom": values[0],
+                                   f"{property_name}-left": values[0]})
+                elif len(values) == 2:  # Vertical | Horizontal
+                    styles.update({f"{property_name}-top": values[0],
+                                   f"{property_name}-bottom": values[0],
+                                   f"{property_name}-right": values[1],
+                                   f"{property_name}-left": values[1]})
+                elif len(values) == 3:  # Top | Horizontal | Bottom
+                    styles.update({f"{property_name}-top": values[0],
+                                   f"{property_name}-right": values[1],
+                                   f"{property_name}-left": values[1],
+                                   f"{property_name}-bottom": values[2]})
+                elif len(values) == 4:  # Top | Right | Bottom | Left
+                    styles.update({f"{property_name}-top": values[0],
+                                   f"{property_name}-right": values[1],
+                                   f"{property_name}-bottom": values[2],
+                                   f"{property_name}-left": values[3]})
+                del styles[property_name]
+            return styles
+
+        # Helper function to extract styles for a specific selector
+        def get_styles(selector, properties):
+            styles = {}
+            for rule in stylesheet:
+                if rule.type == rule.STYLE_RULE and rule.selectorText.strip() == selector:
+                    for prop in rule.style:
+                        if prop.name in properties or any(prop.name.startswith(p) for p in properties):
+                            styles[prop.name] = prop.value
+
+            # Expand shorthand properties
+            styles = expand_shorthand(styles, "margin")
+            styles = expand_shorthand(styles, "padding")
+            return styles
+
+        # Extract relevant styles
+        window_styles = get_styles("#CornerYawn", {"border", "margin", "padding"})
+        icon_styles = get_styles("#CornerYawnIcon", {"margin", "border"})
+
+        # Resolve shorthand and defaults for window styles
+        window_border = int(window_styles.get("border", "0").split()[0].replace("px", ""))
+        window_padding_left = int(window_styles.get("padding-left", "0").replace("px", ""))
+        window_padding_right = int(window_styles.get("padding-right", "0").replace("px", ""))
+        total_horizontal_window_padding = window_padding_left + window_padding_right
+
+        # Resolve shorthand and defaults for icon styles
+        icon_margin_left = int(icon_styles.get("margin-left", "0").replace("px", ""))
+        icon_margin_right = int(icon_styles.get("margin-right", "0").replace("px", ""))
+        icon_border = int(icon_styles.get("border", "0").split()[0].replace("px", ""))
+        total_horizontal_icon_margin = icon_margin_left + icon_margin_right
+
+        # Calculate layout width
+        window_width = int(self.config["width"])
+        layout_remaining_width = (window_width - 2 * window_border 
+                                  - total_horizontal_window_padding 
+                                  - self.icon_size + 2 * icon_border 
+                                  - (total_horizontal_icon_margin if self.icon_size else 0))
+
+        # Set the text container width so the label actually knows
+        # how much it should expand
+        self.text_container.setFixedWidth(layout_remaining_width)
+
+        self.update_text()
+        self.update_bar()
+
     def update_position(self):
         """
         Update the position of the notification based on its size and config
         """
+        super().update_position()
         offset_x = int(self.config["x-offset"])
         offset_y = int(self.config["y-offset"])
         corner_width = int(self.config["width"])
-        corner_height = self.size().height()
+        corner_height = self.height()
         gap = int(self.config["gap"])
         stacking_direction = 1
         screen = self.app.primaryScreen()
@@ -272,9 +377,9 @@ class CornerYawn(BaseYawn):
                 offset_y -
                 corner_height)
             stacking_direction = -1
-        for i in range(len(self.app.corner_yawns) - self.index - 1):
-            if self.app.corner_yawns[i].isVisible():
-                offset_y += (self.app.corner_yawns[i].size().height() + gap) * stacking_direction
+        for i in range(self.index):
+            if self.app.corner_yawns[self.index - 1 - i].isVisible():
+                offset_y += (self.app.corner_yawns[self.index - 1 - i].height() + gap) * stacking_direction
         self.move(offset_x, offset_y)
         if self.index > 0:
             self.app.corner_yawns[self.index-1].update_position()
@@ -287,10 +392,10 @@ class CornerYawn(BaseYawn):
         print(f"closing {self.index}")
         if self in self.app.corner_yawns:
             self.app.corner_yawns.remove(self)
-            for index in range(self.index, len(self.app.corner_yawns)):
+            for index in range(len(self.app.corner_yawns)):
                 self.app.corner_yawns[index].index = index
-            if self.index > 0:
-                self.app.corner_yawns[self.index-1].update_position()
+            if self.app.corner_yawns:
+                self.app.corner_yawns[-1].update_position()
         return super().close()
 
 
@@ -337,6 +442,7 @@ class CenterYawn(BaseYawn):
         """
         Update the position of the notification based on its size and config
         """
+        super().update_position()
         self_width = self.size().width()
         self_height = self.size().height()
         screen = self.app.primaryScreen()

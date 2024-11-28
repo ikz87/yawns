@@ -153,7 +153,8 @@ class YawnsApp(QApplication):
         super().__init__(appname)
         self.display = x11_display
         # Use local qss
-        self.setStyleSheet(open(PROGRAM_DIR + "/style.qss", "r").read())
+        self.stylesheet = open(PROGRAM_DIR + "/style.qss", "r").read()
+        self.setStyleSheet(self.stylesheet)
 
         # Arrays for storing yawns
         self.corner_yawns = []
@@ -276,7 +277,7 @@ if __name__ == '__main__':
     global PROGRAM_DIR
     PROGRAM_DIR = os.path.dirname(os.path.abspath(sys.argv[-1]))
     CONFIG = configparser.ConfigParser()
-    CONFIG.read('./config.ini')
+    CONFIG.read(PROGRAM_DIR + '/config.ini')
 
     # Initialize the application
     x11_display = Display()
