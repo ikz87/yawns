@@ -428,8 +428,7 @@ class CenterYawn(BaseYawn):
 
         self.main_layout = QVBoxLayout(self.main_widget)
         self.main_layout.setSpacing(0)
-        self.upper_layout = QHBoxLayout()
-        self.upper_layout.setSpacing(0)
+        self.main_layout.setContentsMargins(0,0,0,0)
 
         self.main_layout.addWidget(self.icon_label, stretch=1)
         self.main_layout.addWidget(self.text_container, stretch=1)
