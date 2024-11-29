@@ -97,6 +97,11 @@ class NotificationManagerThread(QThread):
         self.notification_received.emit(info_dict)
 
     def close_notification(self, id, reason, sender_id):
+        """
+        Sends two signals, one (qt) to the yawns app to close the yawn with
+        the id provided and another one (dbus) to the sender app to tell it
+        the notification has been closed.
+        """
         message = Message(
             destination=sender_id,
             message_type=MessageType.SIGNAL,  # Signal type
@@ -110,8 +115,10 @@ class NotificationManagerThread(QThread):
         self.notification_closed.emit(id)
 
     def activate_notification(self, info_dict: dict):
-        # This doesn't actually work and I have no idea why
-        # TODO: Fix this, I guess :(
+        """
+        Activates the notification
+        The handling of the activation depends on the sender app
+        """
         actions = info_dict.get("actions", [])
         if actions and len(actions) > 1:
             action_key = actions[0]
@@ -125,9 +132,6 @@ class NotificationManagerThread(QThread):
                 body=[info_dict["notification_id"], action_key],
             )
             self.bus.send(message)
-            # ^ I'm just copying what dunst does.
-            # Not sure if they do something else behind the scenes
-            # but this doesn't work for me
         else:
             print("No actions available to invoke.")
             return
@@ -288,8 +292,48 @@ def handle_sigint():
     manager_thread.stop()
     app.quit()
 
+def check_notification_service():
+    """
+    Check if there's already a notification service running
+    """
+    # Define the actual asynchronous function
+    async def async_check():
+        # Connect to the session bus
+        bus = await MessageBus().connect()
+
+        # Create a message to call the `GetNameOwner` method
+        message = Message(
+            destination="org.freedesktop.DBus",
+            path="/org/freedesktop/DBus",
+            interface="org.freedesktop.DBus",
+            member="GetNameOwner",
+            signature="s",
+            body=["org.freedesktop.Notifications"]
+        )
+
+        # Send the message and get a reply
+        reply = await bus.call(message)
+
+        if reply.message_type == MessageType.ERROR:
+            # If there's an error, it usually means the name is not owned
+            if "org.freedesktop.DBus.Error.NameHasNoOwner" in reply.error_name:
+                return False  # Name is not taken
+            else:
+                print(f"An unexpected error occurred: {reply.error_name}")
+                sys.exit(1)  # Exit on unexpected errors
+        else:
+            return True  # Name is taken
+
+    # Run the asynchronous function synchronously
+    return asyncio.run(async_check())
+
 
 if __name__ == "__main__":
+    # Check if a notification service is already running
+    if check_notification_service():
+        print("A notification service is already running. Exiting...")
+        sys.exit(1)
+
     # Configuration
     global CONFIG
     global PROGRAM_DIR

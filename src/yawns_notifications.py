@@ -32,11 +32,14 @@ class BaseYawn(QWidget):
 
     yawn_activated = pyqtSignal(int)
 
-    def __init__(self, app, config, general_config, info_dict, parent=None):
+    def __init__(self, app, config, info_dict, parent=None):
         super().__init__(parent)
+        if "general" in config:
+            self.general_config = config["general"]
+        else:
+            self.general_config = {}
+
         self.app = app
-        self.config = config
-        self.general_config = general_config
         self.info_dict = info_dict
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.timer = QTimer(self)
@@ -262,8 +265,12 @@ class CornerYawn(BaseYawn):
     """
 
     def __init__(self, app, config, info_dict, parent=None):
+        if "corner" in config:
+            self.config = config["corner"]
+        else:
+            self.config = {}
         super().__init__(
-            app, config["corner"], config["general"], info_dict, parent=parent
+            app, config, info_dict, parent=parent
         )
         self.setFixedWidth(int(self.config.get("width", 400)))
         self.setMaximumHeight(int(self.config.get("height", 500)))
@@ -474,8 +481,12 @@ class CenterYawn(BaseYawn):
     """
 
     def __init__(self, app, config, info_dict, parent=None):
+        if "center" in config:
+            self.config = config["center"]
+        else:
+            self.config = {}
         super().__init__(
-            app, config["center"], config["general"], info_dict, parent=parent
+            app, config, info_dict, parent=parent
         )
 
         self.index = len(app.center_yawns)
