@@ -183,13 +183,17 @@ class BaseYawn(QWidget):
     def show(self):
         # We move the yawn to where it's supposed to be
         # before showing it
+        self.adjust_size()
         self.update_position()
-        super().show()
 
-    def update_position(self):
+    def adjust_size(self):
         self.main_layout.update()
         self.updateGeometry()
         self.adjustSize()
+
+    def update_position(self):
+        super().show()
+        pass
 
     def setup_x11_info(self):
         """
@@ -274,8 +278,8 @@ class CornerYawn(BaseYawn):
         )
         self.setFixedWidth(int(self.config.get("width", 400)))
         self.setMaximumHeight(int(self.config.get("height", 500)))
-        self.index = len(app.corner_yawns)
-        app.corner_yawns.append(self)
+        self.index = len(app.yawn_arrays["CornerYawn"])
+        app.yawn_arrays["CornerYawn"].append(self)
 
         # Set up window
         self.setWindowTitle("yawns - Corner")
@@ -447,17 +451,20 @@ class CornerYawn(BaseYawn):
         if offset_y < 0:
             offset_y = screen.size().height() + offset_y - corner_height
             stacking_direction = -1
-        print(range(len(self.app.corner_yawns) - self.index - 1))
-        for i in range(len(self.app.corner_yawns) - self.index - 1):
-            print(self.index, i)
-            print(len(self.app.corner_yawns) - i)
-            if self.app.corner_yawns[i].isVisible():
+        print(range(len(self.app.yawn_arrays["CornerYawn"]) - self.index - 1))
+        yawns_under_self = len(self.app.yawn_arrays["CornerYawn"]) - self.index - 1
+        for i in range(yawns_under_self):
+            print(self.index, i, self.index + i + 1)
+            if self.app.yawn_arrays["CornerYawn"][self.index + i + 1].isVisible():
                 offset_y += (
-                    self.app.corner_yawns[i].height() + gap
+                    self.app.yawn_arrays["CornerYawn"][self.index + i + 1].height() + gap
                 ) * stacking_direction
+                print(f"adding {self.index + i + 1} to offset of {self.index}")
         self.move(offset_x, offset_y)
+        super().update_position()
         if self.index > 0:
-            self.app.corner_yawns[self.index - 1].update_position()
+            self.app.yawn_arrays["CornerYawn"][self.index - 1].update_position()
+
 
     def close(self):
         """
@@ -465,12 +472,12 @@ class CornerYawn(BaseYawn):
         stacked on it (if any).
         """
         print(f"closing {self.index}")
-        if self in self.app.corner_yawns:
-            self.app.corner_yawns.remove(self)
-            for index in range(len(self.app.corner_yawns)):
-                self.app.corner_yawns[index].index = index
-            if self.app.corner_yawns:
-                self.app.corner_yawns[-1].update_position()
+        if self in self.app.yawn_arrays["CornerYawn"]:
+            self.app.yawn_arrays["CornerYawn"].remove(self)
+            for index in range(len(self.app.yawn_arrays["CornerYawn"])):
+                self.app.yawn_arrays["CornerYawn"][index].index = index
+            if self.app.yawn_arrays["CornerYawn"]:
+                self.app.yawn_arrays["CornerYawn"][-1].update_position()
         return super().close()
 
 
@@ -491,8 +498,8 @@ class CenterYawn(BaseYawn):
             app, config, info_dict, parent=parent
         )
 
-        self.index = len(app.center_yawns)
-        app.center_yawns.append(self)
+        self.index = len(app.yawn_arrays["CenterYawn"])
+        app.yawn_arrays["CenterYawn"].append(self)
 
         # Set up window
         self.setWindowTitle("yawns - Center")
@@ -535,6 +542,6 @@ class CenterYawn(BaseYawn):
         """
         Close widget
         """
-        if self in self.app.center_yawns:
-            self.app.center_yawns.remove(self)
+        if self in self.app.yawn_arrays["CenterYawn"]:
+            self.app.yawn_arrays["CenterYawn"].remove(self)
         return super().close()

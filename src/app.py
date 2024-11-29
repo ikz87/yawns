@@ -164,8 +164,10 @@ class YawnsApp(QApplication):
         self.setStyleSheet(self.stylesheet)
 
         # Arrays for storing yawns
-        self.corner_yawns = []
-        self.center_yawns = []
+        self.yawn_arrays = {
+            "CornerYawn": [],
+            "CenterYawn": [],
+        }
         self.fullscreen_detected = False
 
     def handle_fullscreen_change(self, fullscreen):
@@ -176,7 +178,7 @@ class YawnsApp(QApplication):
         self.fullscreen_detected = fullscreen
         min_corner_urgency = CONFIG.getint("corner", "min_urgency", fallback=2)
         min_center_urgency = CONFIG.getint("center", "min_urgency", fallback=2)
-        for yawn in self.corner_yawns:
+        for yawn in self.yawn_arrays["CornerYawn"]:
             urgency = int(yawn.info_dict["hints"]["urgency"].value)
             if urgency < min_corner_urgency and fullscreen:
                 yawn.hide()
@@ -184,7 +186,7 @@ class YawnsApp(QApplication):
                 yawn.show()
                 yawn.update_position()
 
-        for yawn in self.center_yawns:
+        for yawn in self.yawn_arrays["CenterYawn"]:
             urgency = int(yawn.info_dict["hints"]["urgency"].value)
             if urgency < min_center_urgency and fullscreen:
                 yawn.hide()
@@ -234,11 +236,11 @@ class YawnsApp(QApplication):
     def show_corner_yawn(self, info_dict):
         # First check the replace id
         if info_dict["replaces_id"] != 0:
-            for notification in self.center_yawns:
+            for notification in self.yawn_arrays["CenterYawn"]:
                 if notification.info_dict["replaces_id"] == info_dict["replaces_id"]:
                     notification.info_dict = info_dict
                     notification.close()
-            for notification in self.corner_yawns:
+            for notification in self.yawn_arrays["CornerYawn"]:
                 if notification.info_dict["replaces_id"] == info_dict["replaces_id"]:
                     notification.info_dict = info_dict
                     notification.update_content()
@@ -250,15 +252,15 @@ class YawnsApp(QApplication):
         if urgency < min_urgency and self.fullscreen_detected:
             pass
         else:
-            child_window.show()
+            child_window.update_position()
 
     def show_center_yawn(self, info_dict):
         if info_dict["replaces_id"] != 0:
-            for notification in self.corner_yawns:
+            for notification in self.yawn_arrays["CornerYawn"]:
                 if notification.info_dict["replaces_id"] == info_dict["replaces_id"]:
                     notification.info_dict = info_dict
                     notification.close()
-            for notification in self.center_yawns:
+            for notification in self.yawn_arrays["CenterYawn"]:
                 if notification.info_dict["replaces_id"] == info_dict["replaces_id"]:
                     notification.info_dict = info_dict
                     notification.update_content()
@@ -270,17 +272,17 @@ class YawnsApp(QApplication):
         if urgency < min_urgency and self.fullscreen_detected:
             pass
         else:
-            child_window.show()
+            child_window.update_position()
 
     def close_notification(self, notification_id):
         """
         Close the notification with the given ID
         """
-        for notification in self.corner_yawns:
+        for notification in self.yawn_arrays["CornerYawn"]:
             if notification.info_dict["notification_id"] == notification_id:
                 notification.close()
                 return
-        for notification in self.center_yawns:
+        for notification in self.yawn_arrays["CenterYawn"]:
             if notification.info_dict["notification_id"] == notification_id:
                 notification.close()
                 return
