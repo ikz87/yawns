@@ -428,7 +428,6 @@ class CornerYawn(BaseYawn):
         self.text_container.setFixedWidth(layout_remaining_width)
 
         self.update_text()
-        print(self.body_label.text())
         self.update_bar()
 
     def update_position(self):
@@ -448,10 +447,13 @@ class CornerYawn(BaseYawn):
         if offset_y < 0:
             offset_y = screen.size().height() + offset_y - corner_height
             stacking_direction = -1
-        for i in range(self.index):
-            if self.app.corner_yawns[self.index - 1 - i].isVisible():
+        print(range(len(self.app.corner_yawns) - self.index - 1))
+        for i in range(len(self.app.corner_yawns) - self.index - 1):
+            print(self.index, i)
+            print(len(self.app.corner_yawns) - i)
+            if self.app.corner_yawns[i].isVisible():
                 offset_y += (
-                    self.app.corner_yawns[self.index - 1 - i].height() + gap
+                    self.app.corner_yawns[i].height() + gap
                 ) * stacking_direction
         self.move(offset_x, offset_y)
         if self.index > 0:

@@ -54,7 +54,6 @@ class NotificationManager(ServiceInterface):
             icon_data = hints["icon_data"].value
             if type(icon_data) == list:
                 for i in icon_data:
-                    print(type(i))
                     if type(i) == bytes:
                         hints["icon_data"] = i
                         break
@@ -71,8 +70,6 @@ class NotificationManager(ServiceInterface):
                 hints["icon_data"] = icon_data
         else:
             hints["icon_data"] = None
-
-        print(type(hints["icon_data"]))
 
         self.notification_id += 1
         info_dict = {
