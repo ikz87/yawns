@@ -42,14 +42,17 @@ class FullscreenMonitor(QThread):
             if event.type == X.PropertyNotify:
                 if event.atom == 352:
                     num_of_fs = 0
-                    for window in root.query_tree()._data['children']:
+                    for window in root.query_tree()._data["children"]:
                         self.display.sync()
                         try:
                             width = window.get_geometry()._data["width"]
                             height = window.get_geometry()._data["height"]
                             # Check if the window is mapped and fullscreen
                             if window.get_attributes().map_state != 0:
-                                if width == screen.width_in_pixels and height == screen.height_in_pixels:
+                                if (
+                                    width == screen.width_in_pixels
+                                    and height == screen.height_in_pixels
+                                ):
                                     num_of_fs += 1
                         except Xlib.error.BadDrawable as e:
                             # Uhhhh
@@ -83,25 +86,25 @@ class NotificationManagerThread(QThread):
         self.manager.notify_app = self.notify_app
         self.manager.close_notification = self.close_notification
         self.manager.activate_notification = self.activate_notification
-        self.bus.export('/org/freedesktop/Notifications', self.manager)
-        await self.bus.request_name('org.freedesktop.Notifications')
+        self.bus.export("/org/freedesktop/Notifications", self.manager)
+        await self.bus.request_name("org.freedesktop.Notifications")
         print("Yawns manager running...")
 
     def notify_app(self, info_dict: dict):
         """Emit a PyQt signal when a notification is received."""
-        filtered_dict = {k:v for k,v in info_dict.items() if k != "pixmap_data"}
-        #print(f"Received notification:\n{filtered_dict}")
+        filtered_dict = {k: v for k, v in info_dict.items() if k != "pixmap_data"}
+        # print(f"Received notification:\n{filtered_dict}")
         self.notification_received.emit(info_dict)
 
     def close_notification(self, id, reason, sender_id):
         message = Message(
             destination=sender_id,
-            message_type=MessageType.SIGNAL, # Signal type
+            message_type=MessageType.SIGNAL,  # Signal type
             signature="uu",
-            interface='org.freedesktop.Notifications',
-            path='/org/freedesktop/Notifications',
-            member='NotificationClosed',
-            body=[int(id), int(reason)]
+            interface="org.freedesktop.Notifications",
+            path="/org/freedesktop/Notifications",
+            member="NotificationClosed",
+            body=[int(id), int(reason)],
         )
         self.bus.send(message)
         self.notification_closed.emit(id)
@@ -109,17 +112,17 @@ class NotificationManagerThread(QThread):
     def activate_notification(self, info_dict: dict):
         # This doesn't actually work and I have no idea why
         # TODO: Fix this, I guess :(
-        actions = info_dict.get('actions', [])
+        actions = info_dict.get("actions", [])
         if actions and len(actions) > 1:
             action_key = actions[0]
             message = Message(
                 destination=info_dict["sender_id"],
-                message_type=MessageType.SIGNAL, # Signal type
+                message_type=MessageType.SIGNAL,  # Signal type
                 signature="us",
-                interface='org.freedesktop.Notifications',
-                path='/org/freedesktop/Notifications',
-                member='ActionInvoked',
-                body=[info_dict["notification_id"], action_key]
+                interface="org.freedesktop.Notifications",
+                path="/org/freedesktop/Notifications",
+                member="ActionInvoked",
+                body=[info_dict["notification_id"], action_key],
             )
             self.bus.send(message)
             # ^ I'm just copying what dunst does.
@@ -167,15 +170,23 @@ class YawnsApp(QApplication):
         """
         global CONFIG
         self.fullscreen_detected = fullscreen
-        min_urgency = int(CONFIG["corner"]["fs_urgency"])
+        min_corner_urgency = CONFIG.getint("corner", "min_urgency", fallback=2)
+        min_center_urgency = CONFIG.getint("center", "min_urgency", fallback=2)
         for yawn in self.corner_yawns:
             urgency = int(yawn.info_dict["hints"]["urgency"].value)
-            if urgency < min_urgency and fullscreen:
+            if urgency < min_corner_urgency and fullscreen:
                 yawn.hide()
             else:
                 yawn.show()
                 yawn.update_position()
 
+        for yawn in self.center_yawns:
+            urgency = int(yawn.info_dict["hints"]["urgency"].value)
+            if urgency < min_center_urgency and fullscreen:
+                yawn.hide()
+            else:
+                yawn.show()
+                yawn.update_position()
 
     def select_yawn_type(self, info_dict):
         """
@@ -199,15 +210,22 @@ class YawnsApp(QApplication):
             fallback(info_dict)
 
         # Run command after showing the yawn
-        if CONFIG["general"]["command"]:
+        if "general" in CONFIG.sections() and "command" in CONFIG["general"]:
             command = os.path.expanduser(CONFIG["general"]["command"])
-            subprocess.call([command,
-                             info_dict["app_name"],
-                             info_dict["summary"],
-                             info_dict["body"],
-                             info_dict["app_icon"],
-                             str(info_dict["hints"]["urgency"].value),
-                             ])
+            try:
+                subprocess.call(
+                    [
+                        command,
+                        info_dict["app_name"],
+                        info_dict["summary"],
+                        info_dict["body"],
+                        info_dict["app_icon"],
+                        str(info_dict["hints"]["urgency"].value),
+                    ]
+                )
+            except Exception as e:
+                print("Error running command:", command)
+                print(e)
 
     def show_corner_yawn(self, info_dict):
         # First check the replace id
@@ -223,7 +241,7 @@ class YawnsApp(QApplication):
                     return
         global CONFIG
         child_window = CornerYawn(self, CONFIG, info_dict)
-        min_urgency = int(CONFIG["corner"]["fs_urgency"])
+        min_urgency = CONFIG.getint("corner", "min_urgency", fallback=0)
         urgency = int(info_dict["hints"]["urgency"].value)
         if urgency < min_urgency and self.fullscreen_detected:
             pass
@@ -243,14 +261,12 @@ class YawnsApp(QApplication):
                     return
         global CONFIG
         child_window = CenterYawn(self, CONFIG, info_dict)
-        min_urgency = int(CONFIG["center"]["fs_urgency"])
+        min_urgency = CONFIG.getint("center", "min_urgency", fallback=0)
         urgency = int(info_dict["hints"]["urgency"].value)
         if urgency < min_urgency and self.fullscreen_detected:
             pass
         else:
             child_window.show()
-
-
 
     def close_notification(self, notification_id):
         """
@@ -264,6 +280,8 @@ class YawnsApp(QApplication):
             if notification.info_dict["notification_id"] == notification_id:
                 notification.close()
                 return
+
+
 def handle_sigint():
     """Handle Ctrl+C to gracefully exit."""
     print("\nCtrl+C pressed. Exiting...")
@@ -271,13 +289,13 @@ def handle_sigint():
     app.quit()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Configuration
     global CONFIG
     global PROGRAM_DIR
     PROGRAM_DIR = os.path.dirname(os.path.abspath(sys.argv[-1]))
     CONFIG = configparser.ConfigParser()
-    CONFIG.read(PROGRAM_DIR + '/config.ini')
+    CONFIG.read(PROGRAM_DIR + "/config.ini")
 
     # Initialize the application
     x11_display = Display()
@@ -314,4 +332,3 @@ if __name__ == '__main__':
         sys.exit(app.exec_())
     finally:
         manager_thread.stop()
-
