@@ -482,6 +482,7 @@ class CornerYawn(BaseYawn):
                 self.app.yawn_arrays["CornerYawn"][index].index = index
             if self.app.yawn_arrays["CornerYawn"]:
                 self.app.yawn_arrays["CornerYawn"][-1].update_position()
+                self.app.yawn_arrays["CornerYawn"][-1].next_update_position()
         return super().close()
 
 
