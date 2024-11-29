@@ -115,7 +115,7 @@ class BaseYawn(QWidget):
     def update_text(self):
         if "summary" in self.info_dict and self.info_dict["summary"]:
             text = self.info_dict["summary"].replace("\n", "<br>")
-            self.summary_label.setText("<span style=\"text-decoration: none;\">"+text+"</span>")
+            self.summary_label.setText(text)
             self.summary_label.setMinimumSize(0,0)
             self.summary_label.setMaximumSize(100000,100000)
         else:
@@ -124,7 +124,7 @@ class BaseYawn(QWidget):
 
         if "body" in self.info_dict and self.info_dict["body"]:
             text = self.info_dict["body"].replace("\n", "<br>")
-            self.body_label.setText("<span style=\"text-decoration: none;\">"+text+"</span>")
+            self.body_label.setText(text)
             self.body_label.setMinimumSize(0,0)
             self.body_label.setMaximumSize(100000,100000)
         else:
@@ -254,7 +254,6 @@ class CornerYawn(BaseYawn):
         self.upper_layout = QHBoxLayout()
         self.upper_layout.setContentsMargins(0,0,0,0)
         self.upper_layout.setSpacing(0)
-        self.main_layout.addStretch()
         self.main_layout.addLayout(self.upper_layout)
 
         self.icon_layout = QVBoxLayout()
@@ -268,8 +267,6 @@ class CornerYawn(BaseYawn):
         # We set stretch to make the label fill all the remaining space
         self.upper_layout.addWidget(self.text_container, stretch=1)
 
-        self.upper_layout.addStretch()
-        self.main_layout.addStretch()
 
         self.setup_x11_info()
         self.update_content()
@@ -277,10 +274,10 @@ class CornerYawn(BaseYawn):
     def update_content(self):
         self.restart_timer()
         self.update_icon()
-        # We gotta manually calculate how much space the 
+        # We gotta manually calculate how much space (width) the 
         # text container should take up in the layout
         # because Qt kinda sucks and I'm starting to
-        # realize it
+        # realize it.
 
         # Parse the application stylesheet
         stylesheet = cssutils.parseString(self.app.stylesheet)
@@ -356,6 +353,7 @@ class CornerYawn(BaseYawn):
         self.text_container.setFixedWidth(layout_remaining_width)
 
         self.update_text()
+        print(self.body_label.text())
         self.update_bar()
 
     def update_position(self):
