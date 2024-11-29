@@ -328,7 +328,7 @@ class CornerYawn(BaseYawn):
 
         # Extract relevant styles
         window_styles = get_styles("#CornerYawn", {"border", "margin", "padding"})
-        icon_styles = get_styles("#CornerYawnIcon", {"margin", "border"})
+        icon_styles = get_styles("#CornerYawnIcon", {"border", "margin", "border"})
 
         # Resolve shorthand and defaults for window styles
         window_border = int(window_styles.get("border", "0").split()[0].replace("px", ""))
@@ -339,8 +339,10 @@ class CornerYawn(BaseYawn):
         # Resolve shorthand and defaults for icon styles
         icon_margin_left = int(icon_styles.get("margin-left", "0").replace("px", ""))
         icon_margin_right = int(icon_styles.get("margin-right", "0").replace("px", ""))
+        icon_padding_left = int(icon_styles.get("padding-left", "0").replace("px", ""))
+        icon_padding_right = int(icon_styles.get("padding-right", "0").replace("px", ""))
         icon_border = int(icon_styles.get("border", "0").split()[0].replace("px", ""))
-        total_horizontal_icon_margin = icon_margin_left + icon_margin_right
+        total_horizontal_icon_margin = icon_margin_left + icon_margin_right + icon_padding_left + icon_padding_right
 
         # Calculate layout width
         window_width = int(self.config["width"])
@@ -349,7 +351,7 @@ class CornerYawn(BaseYawn):
                                   - self.icon_size + 2 * icon_border 
                                   - (total_horizontal_icon_margin if self.icon_size else 0))
 
-        # Set the text container width so the label actually knows
+        # Manually set the text container width so the label actually knows
         # how much it should expand
         self.text_container.setFixedWidth(layout_remaining_width)
 
@@ -432,7 +434,7 @@ class CenterYawn(BaseYawn):
         self.upper_layout.setSpacing(0)
 
         self.main_layout.addWidget(self.icon_label, stretch=1)
-        self.main_layout.addWidget(self.text_container, stretch=0)
+        self.main_layout.addWidget(self.text_container, stretch=1)
         self.main_layout.addWidget(self.bar)
 
         self.setup_x11_info()
