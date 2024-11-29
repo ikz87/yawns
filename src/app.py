@@ -203,16 +203,12 @@ class YawnsApp(QApplication):
         if "yawn_type" in info_dict["hints"]:
             yawn_type = int(info_dict["hints"]["yawn_type"].value)
             if yawn_type == YawnType.CORNER.value:
-                print("Showing as a corner yawn")
                 self.show_corner_yawn(info_dict)
             elif yawn_type == YawnType.CENTER.value:
-                print("Showing as a center yawn")
                 self.show_center_yawn(info_dict)
             else:
-                print("Sending as fallback yawn")
                 fallback(info_dict)
         else:
-            print("Sending as fallback yawn")
             fallback(info_dict)
 
         # Run command after showing the yawn

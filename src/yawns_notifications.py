@@ -454,15 +454,12 @@ class CornerYawn(BaseYawn):
         if offset_y < 0:
             offset_y = screen.size().height() + offset_y - corner_height
             stacking_direction = -1
-        print(range(len(self.app.yawn_arrays["CornerYawn"]) - self.index - 1))
         yawns_under_self = len(self.app.yawn_arrays["CornerYawn"]) - self.index - 1
         for i in range(yawns_under_self):
-            print(self.index, i, self.index + i + 1)
             if self.app.yawn_arrays["CornerYawn"][self.index + i + 1].isVisible():
                 offset_y += (
                     self.app.yawn_arrays["CornerYawn"][self.index + i + 1].height() + gap
                 ) * stacking_direction
-                print(f"adding {self.index + i + 1} to offset of {self.index}")
         self.move(offset_x, offset_y)
 
     def next_update_position(self):
@@ -475,7 +472,6 @@ class CornerYawn(BaseYawn):
         Close widget and update the position the one
         stacked on it (if any).
         """
-        print(f"closing {self.index}")
         if self in self.app.yawn_arrays["CornerYawn"]:
             self.app.yawn_arrays["CornerYawn"].remove(self)
             for index in range(len(self.app.yawn_arrays["CornerYawn"])):
