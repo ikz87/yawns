@@ -185,6 +185,8 @@ class BaseYawn(QWidget):
         # before showing it
         self.adjust_size()
         self.update_position()
+        super().show()
+        self.next_update_position()
 
     def adjust_size(self):
         self.main_layout.update()
@@ -192,7 +194,9 @@ class BaseYawn(QWidget):
         self.adjustSize()
 
     def update_position(self):
-        super().show()
+        pass
+
+    def next_update_position(self):
         pass
 
     def setup_x11_info(self):
@@ -438,7 +442,6 @@ class CornerYawn(BaseYawn):
         """
         Update the position of the notification based on its size and config
         """
-        super().update_position()
         offset_x = int(self.config.get("x-offset", -40))
         offset_y = int(self.config.get("y-offset", -40))
         corner_width = self.width()
@@ -461,10 +464,11 @@ class CornerYawn(BaseYawn):
                 ) * stacking_direction
                 print(f"adding {self.index + i + 1} to offset of {self.index}")
         self.move(offset_x, offset_y)
-        super().update_position()
+
+    def next_update_position(self):
         if self.index > 0:
             self.app.yawn_arrays["CornerYawn"][self.index - 1].update_position()
-
+            self.app.yawn_arrays["CornerYawn"][self.index - 1].next_update_position()
 
     def close(self):
         """

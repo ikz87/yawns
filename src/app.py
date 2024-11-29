@@ -252,7 +252,7 @@ class YawnsApp(QApplication):
         if urgency < min_urgency and self.fullscreen_detected:
             pass
         else:
-            child_window.update_position()
+            child_window.show()
 
     def show_center_yawn(self, info_dict):
         if info_dict["replaces_id"] != 0:
@@ -272,7 +272,7 @@ class YawnsApp(QApplication):
         if urgency < min_urgency and self.fullscreen_detected:
             pass
         else:
-            child_window.update_position()
+            child_window.show()
 
     def close_notification(self, notification_id):
         """
