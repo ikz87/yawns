@@ -4,8 +4,9 @@
 
 <h1 align="center"> Your Adaptable Widget Notification System </h1>
 
-![2024-11-2914-49-30-ezgif com-optimize](https://github.com/user-attachments/assets/7ff3b05a-3ab6-4648-aa1d-158521127096)
-
+<p align="center">
+<img src="https://github.com/user-attachments/assets/7ff3b05a-3ab6-4648-aa1d-158521127096" width=100%> 
+</p>
 
 ## Installing
 TODO
