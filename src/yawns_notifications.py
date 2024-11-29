@@ -384,7 +384,7 @@ class CornerYawn(BaseYawn):
 
         # Extract relevant styles
         window_styles = get_styles("#CornerYawn", {"border", "margin", "padding"})
-        icon_styles = get_styles("#CornerYawnIcon", {"border", "margin", "border"})
+        icon_styles = get_styles("#CornerYawnIcon", {"border", "margin", "padding"})
 
         # Resolve shorthand and defaults for window styles
         window_border = int(

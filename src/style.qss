@@ -14,8 +14,9 @@
 
 #CornerYawnIcon {
     margin-right: 10px;
-    border: 0px;
     border-radius: 10px;
+    padding: 10px;
+    background-color: #0F1013;
 }
 
 #CornerYawnTextContainer {
@@ -31,7 +32,6 @@
 
 #CornerYawnBar {
     height: 5px;
-    margin: 3px;
     border-radius: 10px;
     margin-top: 6px;
     padding: 7.5px;
@@ -51,7 +51,7 @@
 }
 
 #CenterYawnIcon {
-    margin: 10px;
+    margin-bottom: 10px;
 }
 
 #CenterYawnTextContainer {
