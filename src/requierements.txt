@@ -1,0 +1,4 @@
+PyQt5
+cssutils
+python-xlib
+dbus-next
