@@ -290,7 +290,7 @@ class CornerYawn(BaseYawn):
         self.setCursor(Qt.PointingHandCursor)
         self.wm_class = "corner - yawn"
         self.setup_widgets()
-        self.icon_label.setAlignment(Qt.AlignTop)
+        self.icon_label.setAlignment(Qt.AlignCenter)
         self.summary_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.body_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.bar.setOrientation(Qt.Horizontal)
