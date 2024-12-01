@@ -117,9 +117,9 @@ class BaseYawn(QWidget):
         Updates the icon widget
         """
         self.icon_size = 0
-        if self.info_dict["hints"].get("icon_data", None):
+        if self.info_dict.get("img_byte_arr", None):
             image_pixmap = QPixmap()
-            if image_pixmap.loadFromData(self.info_dict["hints"]["icon_data"]):
+            if image_pixmap.loadFromData(self.info_dict["img_byte_arr"]):
                 self.icon_size = int(self.config.get("icon-size", 64))
                 image_pixmap = image_pixmap.scaled(
                     self.icon_size,
