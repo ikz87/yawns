@@ -9,7 +9,7 @@
 </p>
 
 ## Installing
-TODO
+Run `install.sh` as sudo and that's it.
 
 ## Features
 - Full markup on summary and body
@@ -17,4 +17,4 @@ TODO
 - Completely different yawns (notification windows) based on notification hints
 
 
-Check out the wiki for more information
+Check out the wiki (coming soon) for more information
