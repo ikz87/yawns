@@ -14,6 +14,7 @@ import asyncio
 from Xlib import X
 from Xlib.display import Display
 from Xlib.Xatom import ATOM
+import argparse
 import Xlib
 import Xlib.threaded
 
@@ -160,7 +161,7 @@ class YawnsApp(QApplication):
         super().__init__(appname)
         self.display = x11_display
         # Use local qss
-        self.stylesheet = open(CONFIG_DIR + "/style.qss", "r").read()
+        self.stylesheet = open(STYLE_PATH, "r").read()
         self.setStyleSheet(self.stylesheet)
 
         # Arrays for storing yawns
@@ -327,17 +328,48 @@ def check_notification_service():
 
 
 if __name__ == "__main__":
+    global CONFIG
+    global STYLE_PATH
+    global CONFIG_PATH
+    global VERSION
+    VERSION = "yawns v1.1.0"
+
     # Check if a notification service is already running
     if check_notification_service():
         print("A notification service is already running. Exiting...")
         sys.exit(1)
 
+    # CL Arguments
+    argparser = argparse.ArgumentParser(
+        prog="yawns",
+        description="Your Adaptable Widget Notification System")
+    argparser.add_argument("-c", "--config", type=str, default=None, help="Path to the config.ini file")
+    argparser.add_argument("-s", "--style", type=str, default=None, help="Path to the style.qss file")
+    argparser.add_argument("-v", "--version", action="version", version=VERSION)
+    args = argparser.parse_args()
+
     # Configuration
-    global CONFIG
-    global CONFIG_DIR
     CONFIG_DIR = os.path.expanduser("~/.config/yawns")
+    if args.config:
+        CONFIG_PATH = args.config
+
+        # Check if the configuration exists
+        if not os.path.isfile(CONFIG_PATH):
+            print(f"Configuration file '{CONFIG_PATH}' does not exist. Exiting...")
+            sys.exit(1)
+    else:
+        CONFIG_PATH = CONFIG_DIR + "/config.ini"
+    if args.style:
+        STYLE_PATH = args.style
+        # Check if the style exists
+        if not os.path.isfile(STYLE_PATH):
+            print(f"Style file '{STYLE_PATH}' does not exist. Exiting...")
+            sys.exit(1)
+    else:
+        STYLE_PATH = CONFIG_DIR + "/style.qss"
+
     CONFIG = configparser.ConfigParser()
-    CONFIG.read(CONFIG_DIR + "/config.ini")
+    CONFIG.read(CONFIG_PATH)
 
     # Initialize the application
     x11_display = Display()
