@@ -86,7 +86,7 @@ class NotificationManagerThread(QThread):
         self.manager = NotificationManager(self.bus)
         self.manager.notify_app = self.notify_app
         self.manager.close_notification = self.close_notification
-        self.manager.activate_notification = self.activate_notification
+        self.manager.do_action_on_notification = self.do_action_on_notification
         self.bus.export("/org/freedesktop/Notifications", self.manager)
         await self.bus.request_name("org.freedesktop.Notifications")
         print("Yawns manager running...")
@@ -115,27 +115,21 @@ class NotificationManagerThread(QThread):
         self.bus.send(message)
         self.notification_closed.emit(id)
 
-    def activate_notification(self, info_dict: dict):
+    def do_action_on_notification(self, id, action, sender_id):
         """
-        Activates the notification
-        The handling of the activation depends on the sender app
+        Performs an action on notification
+        The handling of the action depends on the sender app
         """
-        actions = info_dict.get("actions", [])
-        if actions and len(actions) > 1:
-            action_key = actions[0]
-            message = Message(
-                destination=info_dict["sender_id"],
-                message_type=MessageType.SIGNAL,  # Signal type
-                signature="us",
-                interface="org.freedesktop.Notifications",
-                path="/org/freedesktop/Notifications",
-                member="ActionInvoked",
-                body=[info_dict["notification_id"], action_key],
-            )
-            self.bus.send(message)
-        else:
-            print("No actions available to invoke.")
-            return
+        message = Message(
+            destination=sender_id,
+            message_type=MessageType.SIGNAL,  # Signal type
+            signature="us",
+            interface="org.freedesktop.Notifications",
+            path="/org/freedesktop/Notifications",
+            member="ActionInvoked",
+            body=[id, action],
+        )
+        self.bus.send(message)
 
     def run(self):
         """Run the D-Bus manager in its own thread."""
@@ -154,7 +148,7 @@ class NotificationManagerThread(QThread):
 
 class YawnsApp(QApplication):
     request_notification_closing = pyqtSignal(int, int, str)
-    request_notification_activation = pyqtSignal(dict)
+    request_notification_action = pyqtSignal(int, str, str)
 
     def __init__(self, appname, x11_display):
         self.setAttribute(Qt.AA_X11InitThreads)
@@ -385,7 +379,7 @@ if __name__ == "__main__":
     manager_thread.notification_received.connect(app.select_yawn_type)
 
     app.request_notification_closing.connect(manager_thread.close_notification)
-    app.request_notification_activation.connect(manager_thread.activate_notification)
+    app.request_notification_action.connect(manager_thread.do_action_on_notification)
 
     manager_thread.notification_closed.connect(app.close_notification)
     manager_thread.start()

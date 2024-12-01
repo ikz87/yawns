@@ -104,7 +104,7 @@ class NotificationManager(ServiceInterface):
     def close_notification(self, id, reason, sender_id):
         pass
 
-    def activate_notification(self, info_dict: dict):
+    def do_action_on_notification(self, id, action, sender_id):
         pass
 
 

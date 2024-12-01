@@ -33,9 +33,23 @@
 #CornerYawnBar {
     height: 5px;
     border-radius: 10px;
-    margin-top: 6px;
+    margin-top: 10px;
     padding: 7.5px;
     background-color: #0F1013;
+}
+
+#CornerYawnButtonsContainer {
+    background-color: #0F1013;
+    margin-top: 10px;
+    border-radius: 10px;
+    padding: 5px;
+}
+
+#CornerYawnActionButton, #CornerYawnCloseButton {
+    border-radius: 5px;
+    margin: 5px;
+    padding: 5px;
+    background-color: #24272F;
 }
 
 #CornerYawnBar::chunk {

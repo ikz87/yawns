@@ -3,6 +3,7 @@ import cssutils
 from PyQt5.QtWidgets import (
     QProgressBar,
     QHBoxLayout,
+    QPushButton,
     QSizePolicy,
     QVBoxLayout,
     QWidget,
@@ -54,24 +55,24 @@ class BaseYawn(QWidget):
         """
         Setup all needed widgets for the yawn
         """
-        yawn_class = type(self).__name__
+        self.yawn_class = type(self).__name__
         # Gotta use a QFrame to fill the whole widget
         # to allow bg transparency through QSS correctly
         self.main_container_layout = QVBoxLayout(self)
         self.main_container_layout.setContentsMargins(0, 0, 0, 0)
         self.main_container_layout.setSpacing(0)
         self.main_widget = QFrame()
-        self.main_widget.setObjectName(yawn_class)
+        self.main_widget.setObjectName(self.yawn_class)
         self.main_container_layout.addWidget(self.main_widget)
 
         self.icon_label = QLabel()
-        self.icon_label.setObjectName(yawn_class + "Icon")
+        self.icon_label.setObjectName(self.yawn_class + "Icon")
 
         self.summary_label = QLabel()
-        self.summary_label.setObjectName(yawn_class + "Summary")
+        self.summary_label.setObjectName(self.yawn_class + "Summary")
         self.summary_label.setWordWrap(True)
         self.body_label = QLabel()
-        self.body_label.setObjectName(yawn_class + "Body")
+        self.body_label.setObjectName(self.yawn_class + "Body")
         self.body_label.setWordWrap(True)
         self.labels_layout = QVBoxLayout()
         self.labels_layout.setContentsMargins(0, 0, 0, 0)
@@ -79,14 +80,20 @@ class BaseYawn(QWidget):
         self.labels_layout.addWidget(self.summary_label)
         self.labels_layout.addWidget(self.body_label)
         self.text_container = QFrame()
-        self.text_container.setObjectName(yawn_class + "TextContainer")
+        self.text_container.setObjectName(self.yawn_class + "TextContainer")
         self.text_container.setLayout(self.labels_layout)
 
         self.bar = QProgressBar()
-        self.bar.setObjectName(yawn_class + "Bar")
+        self.bar.setObjectName(self.yawn_class + "Bar")
         self.bar.setTextVisible(False)
         self.bar.setMaximum(100)
         self.bar.setMinimum(0)
+
+        self.buttons_container = QFrame()
+        self.buttons_container.setObjectName(self.yawn_class + "ButtonsContainer")
+        self.buttons_layout = QHBoxLayout(self.buttons_container)
+        self.buttons_layout.setContentsMargins(0, 0, 0, 0)
+        self.buttons_layout.setSpacing(0)
 
     def restart_timer(self):
         """
@@ -166,6 +173,47 @@ class BaseYawn(QWidget):
             self.bar.setValue(0)
             self.bar.setFixedSize(0, 0)
 
+
+    def update_buttons(self):
+        """
+        Updates the action buttons
+        """
+        def empty_layout(layout):
+            # Empties a layout recursively
+            while layout.count():
+                to_delete = layout.itemAt(0)
+                if to_delete is not None:
+                    child_layout = to_delete.layout()
+                    if child_layout is not None:
+                        empty_layout(child_layout)
+                    child_widget = to_delete.widget()
+                    if child_widget is not None:
+                        child_widget.deleteLater()
+                    layout.removeItem(to_delete)
+
+        # Delete the current buttons before adding the new ones
+        empty_layout(self.buttons_layout)
+        if "actions" in self.info_dict and self.info_dict["actions"]:
+            actions = self.info_dict["actions"]
+            for action_index in range(1,len(actions),2):
+                action_text  = actions[action_index]
+                action  = actions[action_index - 1]
+                action_button = QPushButton(action_text)
+                action_button.setCursor(Qt.PointingHandCursor)
+                action_button.setObjectName(self.yawn_class+"ActionButton")
+                action_button.clicked.connect(lambda _, act=action: self.action_clicked(act))
+                self.buttons_layout.addWidget(action_button)
+            close_button = QPushButton("Close")
+            close_button.setObjectName(self.yawn_class+"CloseButton")
+            close_button.setCursor(Qt.PointingHandCursor)
+            close_button.clicked.connect(lambda: (
+                self.app.request_notification_closing.emit(
+                    self.info_dict["notification_id"], 1, self.info_dict["sender_id"]
+                )))
+            self.buttons_layout.addWidget(close_button)
+        else:
+            self.buttons_container.setFixedSize(0, 0)
+
     def update_content(self):
         """
         Update the content of the yawn using its info_dict
@@ -179,6 +227,21 @@ class BaseYawn(QWidget):
         self.update_icon()
         self.update_text()
         self.update_bar()
+        self.update_buttons()
+
+    def action_clicked(self, action):
+        """
+        Called when an action button is clicked
+        """
+        self.app.request_notification_action.emit(
+            self.info_dict["notification_id"],
+            action,
+            self.info_dict["sender_id"],
+        )
+        self.app.request_notification_closing.emit(
+            self.info_dict["notification_id"], 1, self.info_dict["sender_id"]
+        )
+
 
     def show(self):
         # We move the yawn to where it's supposed to be
@@ -249,15 +312,22 @@ class BaseYawn(QWidget):
         super().mousePressEvent(a0)
 
         def do_actions(actions):
-            if "activate" in actions:
-                self.app.request_notification_activation.emit(self.info_dict)
+            if "default" in actions:
+                if "actions" in self.info_dict and self.info_dict["actions"]:
+                    self.app.request_notification_action.emit(
+                        self.info_dict["notification_id"],
+                        self.info_dict["actions"][0],
+                        self.info_dict["sender_id"],
+                    )
+                else:
+                    print(f"No actions available for notification {self.info_dict["notification_id"]}")
             if "close" in actions:
                 self.app.request_notification_closing.emit(
                     self.info_dict["notification_id"], 1, self.info_dict["sender_id"]
                 )
 
         if a0.button() == Qt.LeftButton:
-            do_actions(self.general_config.get("mouse-left-click", "activate close"))
+            do_actions(self.general_config.get("mouse-left-click", "close"))
         elif a0.button() == Qt.RightButton:
             do_actions(self.general_config.get("mouse-right-click", "close"))
         elif a0.button() == Qt.MiddleButton:
@@ -287,7 +357,6 @@ class CornerYawn(BaseYawn):
 
         # Set up window
         self.setWindowTitle("yawns - Corner")
-        self.setCursor(Qt.PointingHandCursor)
         self.wm_class = "corner - yawn"
         self.setup_widgets()
         self.icon_label.setAlignment(Qt.AlignCenter)
@@ -311,6 +380,7 @@ class CornerYawn(BaseYawn):
         self.icon_layout.addStretch()
 
         self.main_layout.addWidget(self.bar)
+        self.main_layout.addWidget(self.buttons_container, stretch=1)
         self.upper_layout.addLayout(self.icon_layout)
         self.upper_layout.addWidget(self.text_container, stretch=1)
 
@@ -437,6 +507,7 @@ class CornerYawn(BaseYawn):
 
         self.update_text()
         self.update_bar()
+        self.update_buttons()
 
     def update_position(self):
         """
