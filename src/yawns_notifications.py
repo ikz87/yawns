@@ -193,7 +193,10 @@ class BaseYawn(QWidget):
 
         # Delete the current buttons before adding the new ones
         empty_layout(self.buttons_layout)
-        if "actions" in self.info_dict and self.info_dict["actions"]:
+        if ("actions" in self.info_dict
+                and self.info_dict["actions"]
+                and self.config.get("show_buttons", "false") == "true"
+                ):
             actions = self.info_dict["actions"]
             for action_index in range(1,len(actions),2):
                 action_text  = actions[action_index]
