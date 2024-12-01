@@ -174,16 +174,14 @@ class YawnsApp(QApplication):
         min_corner_urgency = CONFIG.getint("corner", "min_urgency", fallback=2)
         min_center_urgency = CONFIG.getint("center", "min_urgency", fallback=2)
         for yawn in self.yawn_arrays["CornerYawn"]:
-            urgency = int(yawn.info_dict["hints"]["urgency"].value)
-            if urgency < min_corner_urgency and fullscreen:
+            if yawn.urgency < min_corner_urgency and fullscreen:
                 yawn.hide()
             else:
                 yawn.show()
                 yawn.update_position()
 
         for yawn in self.yawn_arrays["CenterYawn"]:
-            urgency = int(yawn.info_dict["hints"]["urgency"].value)
-            if urgency < min_center_urgency and fullscreen:
+            if yawn.urgency < min_center_urgency and fullscreen:
                 yawn.hide()
             else:
                 yawn.show()
@@ -209,6 +207,10 @@ class YawnsApp(QApplication):
         # Run command after showing the yawn
         if "general" in CONFIG.sections() and "command" in CONFIG["general"]:
             command = os.path.expanduser(CONFIG["general"]["command"])
+            urgency_struct = info_dict["hints"].get("urgency", None)
+            urgency = 1
+            if urgency_struct:
+                urgency = int(urgency_struct.value)
             try:
                 subprocess.call(
                     [
@@ -217,7 +219,7 @@ class YawnsApp(QApplication):
                         info_dict["summary"],
                         info_dict["body"],
                         info_dict["app_icon"],
-                        str(info_dict["hints"]["urgency"].value),
+                        str(urgency),
                     ]
                 )
             except Exception as e:
@@ -237,13 +239,12 @@ class YawnsApp(QApplication):
                     notification.update_content()
                     return
         global CONFIG
-        child_window = CornerYawn(self, CONFIG, info_dict)
+        yawn = CornerYawn(self, CONFIG, info_dict)
         min_urgency = CONFIG.getint("corner", "min_urgency", fallback=0)
-        urgency = int(info_dict["hints"]["urgency"].value)
-        if urgency < min_urgency and self.fullscreen_detected:
+        if yawn.urgency < min_urgency and self.fullscreen_detected:
             pass
         else:
-            child_window.show()
+            yawn.show()
 
     def show_center_yawn(self, info_dict):
         if info_dict["replaces_id"] != 0:
@@ -257,13 +258,12 @@ class YawnsApp(QApplication):
                     notification.update_content()
                     return
         global CONFIG
-        child_window = CenterYawn(self, CONFIG, info_dict)
+        yawn = CenterYawn(self, CONFIG, info_dict)
         min_urgency = CONFIG.getint("center", "min_urgency", fallback=0)
-        urgency = int(info_dict["hints"]["urgency"].value)
-        if urgency < min_urgency and self.fullscreen_detected:
+        if yawn.urgency < min_urgency and self.fullscreen_detected:
             pass
         else:
-            child_window.show()
+            yawn.show()
 
     def close_notification(self, notification_id):
         """

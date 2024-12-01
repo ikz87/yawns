@@ -104,7 +104,7 @@ class NotificationManager(ServiceInterface):
                 fd_icon = find_icon(image_path)
                 if fd_icon:
                     try:
-                        with open(image_path, "rb") as img_file:
+                        with open(fd_icon, "rb") as img_file:
                             img_byte_arr = img_file.read()
                     except Exception as e:
                         print(f"Error opening image file: {e}")

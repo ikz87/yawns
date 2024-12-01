@@ -270,7 +270,11 @@ class BaseYawn(QWidget):
         Set up X11 properties for the window,
         based on the urgency of the notification.
         """
-        urgency = int(self.info_dict["hints"]["urgency"].value)
+        urgency_struct = self.info_dict["hints"].get("urgency", None)
+        self.urgency = 1
+        if urgency_struct:
+            self.urgency = int(urgency_struct.value)
+
         if QX11Info.isPlatformX11():
             # Open the X display connection
             x11_display = self.app.display
@@ -292,7 +296,7 @@ class BaseYawn(QWidget):
 
             # Set _NET_WM_STATE to ABOVE for high urgency
             # (even though that doesn't actually work)
-            if urgency == 2:  # High urgency
+            if self.urgency == 2:  # High urgency
                 window.change_property(_NET_WM_STATE, ATOM, 32, [_NET_WM_STATE_ABOVE])
             else:  # Normal or low urgency
                 window.change_property(_NET_WM_STATE, ATOM, 32, [])
