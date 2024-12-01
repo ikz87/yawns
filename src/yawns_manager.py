@@ -3,6 +3,8 @@ from dbus_next.constants import MessageType
 from dbus_next.service import ServiceInterface, method, dbus_property, signal
 from dbus_next.aio import MessageBus
 from dbus_next.message import Message
+from PIL import Image
+import io
 import asyncio
 
 from yawns_notifications import BaseYawn
@@ -45,21 +47,31 @@ class NotificationManager(ServiceInterface):
         # Load the image asap because it gets deleted instantly
         image_path = ""
         app_icon_path = ""
-        if "image_path" in hints:
-            image_path = hints["image_path"].value.replace("file://", "")
+        if "image-path" in hints:
+            image_path = hints["image-path"].value.replace("file://", "")
         if app_icon:
             app_icon_path = app_icon.replace("file://", "")
         icon_data = None
         if "icon_data" in hints:
             icon_data = hints["icon_data"].value
-            if type(icon_data) == list:
-                for i in icon_data:
-                    if type(i) == bytes:
-                        hints["icon_data"] = i
-                        break
-            elif type(icon_data) == bytes:
-                hints["icon_data"] = icon_data
-
+            # Create an image from the byte array (icon_data is expected to be in RGB format)
+            image = Image.frombytes(
+                "RGB", 
+                (icon_data[0], icon_data[1]),  # width, height
+                bytes(icon_data[6]),  # RGB data (ay) part
+                "raw", 
+                "RGB", 
+                icon_data[2],  # rowstride
+                icon_data[3],  # channels (3 or 4)
+            )
+            if icon_data[3]:  # has_alpha
+                image = image.convert("RGBA")
+            # Save the image as PNG to a BytesIO object
+            img_byte_arr = io.BytesIO()
+            image.save(img_byte_arr, format="PNG")
+            img_byte_arr = img_byte_arr.getvalue()
+            # Set the icon_data hint as the PNG image bytes
+            hints["icon_data"] = img_byte_arr
         elif image_path:
             with open(image_path, "rb") as img_file:
                 icon_data = img_file.read()
