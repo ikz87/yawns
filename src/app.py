@@ -208,10 +208,8 @@ class YawnsApp(QApplication):
             yawn_type = int(info_dict["hints"]["yawn_type"].value)
         # Modify yawn_type according to filters in config
         for yawn_type_value, section in enumerate(["corner", "center", "media"]):
-            print(section, yawn_type_value)
             for section_filter in ["app_name", "summary", "body"]:
                 filter_value = CONFIG.get(section, section_filter, fallback=None)
-                print(filter_value, info_dict.get(section_filter, None))
                 if filter_value and info_dict.get(section_filter, None) == filter_value:
                     yawn_type = yawn_type_value + 1
                     break
