@@ -13,7 +13,7 @@ from PyQt5.QtWidgets import (
     QStyle,
 )
 from PyQt5.QtCore import QSize, Qt, QTimer, pyqtSignal
-from PyQt5.QtGui import QPixmap
+from PyQt5.QtGui import QPainter, QPainterPath, QPixmap
 from enum import Enum
 import time
 from PyQt5.QtX11Extras import QX11Info
@@ -21,11 +21,13 @@ from Xlib.display import Display
 from Xlib.Xatom import STRING, ATOM
 import Xlib
 import dbus
+from custom_widgets import SpinningImage
 
 
 class YawnType(Enum):
     CORNER = 1
     CENTER = 2
+    MEDIA = 3
 
 
 class BaseYawn(QWidget):
@@ -35,6 +37,7 @@ class BaseYawn(QWidget):
 
     def __init__(self, app, config, info_dict, parent=None):
         super().__init__(parent)
+        self.yawn_class = type(self).__name__
         if "general" in config:
             self.general_config = config["general"]
         else:
@@ -55,7 +58,6 @@ class BaseYawn(QWidget):
         """
         Setup all needed widgets for the yawn
         """
-        self.yawn_class = type(self).__name__
         # Gotta use a QFrame to fill the whole widget
         # to allow bg transparency through QSS correctly
         self.main_container_layout = QVBoxLayout(self)
@@ -345,7 +347,7 @@ class BaseYawn(QWidget):
 class CornerYawn(BaseYawn):
     """
     The most classic notification design.
-    Show a notification anchored to one of the corners of your screen.
+    Shows up as a window anchored to one of the corners of your screen.
     Multiple notifications stack vertically.
     """
 
@@ -360,7 +362,7 @@ class CornerYawn(BaseYawn):
         self.setFixedWidth(int(self.config.get("width", 400)))
         self.setMaximumHeight(int(self.config.get("height", 500)))
         self.index = len(app.yawn_arrays["CornerYawn"])
-        app.yawn_arrays["CornerYawn"].append(self)
+        app.yawn_arrays[self.yawn_class].append(self)
 
         # Set up window
         self.setWindowTitle("yawns - Corner")
@@ -578,7 +580,7 @@ class CenterYawn(BaseYawn):
         )
 
         self.index = len(app.yawn_arrays["CenterYawn"])
-        app.yawn_arrays["CenterYawn"].append(self)
+        app.yawn_arrays[self.yawn_class].append(self)
 
         # Set up window
         self.setWindowTitle("yawns - Center")
@@ -623,4 +625,329 @@ class CenterYawn(BaseYawn):
         """
         if self in self.app.yawn_arrays["CenterYawn"]:
             self.app.yawn_arrays["CenterYawn"].remove(self)
+        return super().close()
+
+class MediaYawn(BaseYawn):
+    """
+    The most classic notification design.
+    Shows up as a window anchored to one of the corners of your screen.
+    Multiple notifications stack vertically.
+    """
+
+    def __init__(self, app, config, info_dict, parent=None):
+        if "media" in config:
+            self.config = config["media"]
+        else:
+            self.config = {}
+        super().__init__(
+            app, config, info_dict, parent=parent
+        )
+        self.setFixedWidth(int(self.config.get("width", 400)))
+        self.setMaximumHeight(int(self.config.get("height", 500)))
+        self.index = len(app.yawn_arrays["CornerYawn"])
+        app.yawn_arrays[self.yawn_class].append(self)
+
+        # Set up window
+        self.setWindowTitle("yawns - Media")
+        self.wm_class = "media - yawn"
+        self.setup_widgets()
+
+        self.icon_label.setAlignment(Qt.AlignCenter)
+        self.summary_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.body_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.bar.setOrientation(Qt.Horizontal)
+        self.text_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.summary_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.body_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.bar.setOrientation(Qt.Horizontal)
+        self.text_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+        self.main_layout = QVBoxLayout(self.main_widget)
+        self.main_layout.setContentsMargins(0, 0, 0, 0)
+        self.main_layout.setSpacing(0)
+        self.upper_layout = QHBoxLayout()
+        self.upper_layout.setContentsMargins(0, 0, 0, 0)
+        self.upper_layout.setSpacing(0)
+        self.main_layout.addLayout(self.upper_layout)
+
+        self.icon_layout = QVBoxLayout()
+        self.icon_layout.setContentsMargins(0, 0, 0, 0)
+        self.icon_layout.setSpacing(0)
+        self.icon_layout.addWidget(self.icon_label)
+        self.icon_layout.addStretch()
+
+        self.main_layout.addWidget(self.bar)
+        self.main_layout.addWidget(self.buttons_container, stretch=1)
+        self.upper_layout.addLayout(self.icon_layout)
+        self.upper_layout.addWidget(self.text_container, stretch=1)
+
+        # Timer for rotating the icon
+        self.icon_timer = QTimer()
+        fps = int(self.config.get("fps", 30))
+        self.icon_timer.setInterval(round(1000/fps))
+        self.icon_timer.timeout.connect(lambda: self.rotate_icon(5))
+        self.result_pixmap = None
+        self.angle = 0
+
+        self.setup_x11_info()
+        self.update_content()
+
+    def rotate_icon(self, angle_increment):
+        """
+        Rotates the pixmap displayed on self.icon_label by the given angle.
+
+        :param angle: The angle in degrees to rotate the pixmap.
+        """
+        if self.result_pixmap is None:
+            return  # Safeguard in case no pixmap is set
+        # Create a new pixmap of the same size as the original
+        rotated_pixmap = QPixmap(self.result_pixmap.size())
+        rotated_pixmap.fill(Qt.transparent)  # Fill with transparent background
+
+        # Use QPainter to rotate the pixmap
+        painter = QPainter(rotated_pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform)
+
+        # Translate to the center of the pixmap, rotate, and then draw the original pixmap
+        center = self.result_pixmap.rect().center()
+        painter.translate(center)
+        self.angle += angle_increment
+        painter.rotate(self.angle)
+        painter.translate(-center)
+
+        # Draw the original pixmap
+        painter.drawPixmap(0, 0, self.result_pixmap)
+        
+        painter.end()
+        self.icon_label.setPixmap(rotated_pixmap)
+
+
+    def update_icon(self):
+        """
+        Update the spinning image on top of the vynil icon_label
+        """
+        self.icon_size = 0
+        if self.info_dict.get("img_byte_arr", None):
+            image_pixmap = QPixmap()
+            if image_pixmap.loadFromData(self.info_dict["img_byte_arr"]):
+                self.icon_size = int(self.config.get("icon-size", 64))
+                # Crop the image to a square
+                original_width = image_pixmap.width()
+                original_height = image_pixmap.height()
+                size = min(original_width, original_height)  # Largest square size
+                rect = (
+                    (original_width - size) // 2,
+                    (original_height - size) // 2,
+                    size,
+                    size,
+                )
+                image_pixmap = image_pixmap.copy(*rect)
+
+                scaled_size = round(self.icon_size*0.5)
+                # Scale the cropped square
+                image_pixmap = image_pixmap.scaled(
+                    scaled_size,
+                    scaled_size,
+                    Qt.KeepAspectRatioByExpanding,
+                    Qt.SmoothTransformation,
+                )
+
+                # Create a rounded pixmap
+                rounded_pixmap = QPixmap(scaled_size, scaled_size)
+                rounded_pixmap.fill(Qt.transparent)  # Transparent background
+
+                # Draw the rounded pixmap
+                painter = QPainter(rounded_pixmap)
+                painter.setRenderHint(QPainter.Antialiasing)
+                path = QPainterPath()
+                path.addEllipse(0, 0, scaled_size, scaled_size)  # Circle bounds
+                painter.setClipPath(path)
+                painter.drawPixmap(0, 0, image_pixmap)
+                painter.end()
+
+                vinyl_pixmap = QPixmap()
+                vinyl_pixmap.load("/usr/share/yawns/assets/vinyl.png")
+                vinyl_pixmap = vinyl_pixmap.scaled(
+                    self.icon_size,
+                    self.icon_size,
+                    Qt.IgnoreAspectRatio,
+                    Qt.SmoothTransformation,
+                )
+                # Create a new QPixmap the same size as the background
+                self.result_pixmap = QPixmap(vinyl_pixmap.size())
+                self.result_pixmap.fill(Qt.transparent)  # Ensure the pixmap starts transparent
+
+                # Create a QPainter to draw the images
+                painter = QPainter(self.result_pixmap)
+                painter.setRenderHint(QPainter.Antialiasing)
+
+                # Draw the background
+                painter.drawPixmap(0, 0, vinyl_pixmap)
+
+                # Determine the position for the overlay
+                x = (vinyl_pixmap.width() - rounded_pixmap.width()) // 2
+                y = (vinyl_pixmap.height() - rounded_pixmap.height()) // 2
+
+                # Draw the overlay
+                painter.drawPixmap(x, y, rounded_pixmap)
+                painter.end()
+                self.icon_label.setPixmap(self.result_pixmap)
+                self.icon_label.setMinimumSize(0, 0)
+                self.icon_label.setMaximumSize(100000, 100000)
+
+                self.icon_timer.start()
+            else:
+                self.result_pixmap = None
+                self.icon_label.clear()
+                self.icon_label.setFixedSize(0, 0)
+        else:
+            self.result_pixmap = None
+            self.icon_label.clear()
+            self.icon_label.setFixedSize(0, 0)
+
+    def update_content(self):
+        self.restart_timer()
+        self.update_icon()
+        # We gotta manually calculate how much space (width) the
+        # text container should take up in the layout
+        # because Qt kinda sucks and I'm starting to
+        # realize it.
+
+        # Parse the application stylesheet
+        stylesheet = cssutils.parseString(self.app.stylesheet)
+
+        # Helper function to expand shorthand properties
+        def expand_shorthand(styles, property_name):
+            if property_name in styles:
+                values = styles[property_name].split()
+                if len(values) == 1:  # All sides same
+                    styles.update(
+                        {
+                            f"{property_name}-top": values[0],
+                            f"{property_name}-right": values[0],
+                            f"{property_name}-bottom": values[0],
+                            f"{property_name}-left": values[0],
+                        }
+                    )
+                elif len(values) == 2:  # Vertical | Horizontal
+                    styles.update(
+                        {
+                            f"{property_name}-top": values[0],
+                            f"{property_name}-bottom": values[0],
+                            f"{property_name}-right": values[1],
+                            f"{property_name}-left": values[1],
+                        }
+                    )
+                elif len(values) == 3:  # Top | Horizontal | Bottom
+                    styles.update(
+                        {
+                            f"{property_name}-top": values[0],
+                            f"{property_name}-right": values[1],
+                            f"{property_name}-left": values[1],
+                            f"{property_name}-bottom": values[2],
+                        }
+                    )
+                elif len(values) == 4:  # Top | Right | Bottom | Left
+                    styles.update(
+                        {
+                            f"{property_name}-top": values[0],
+                            f"{property_name}-right": values[1],
+                            f"{property_name}-bottom": values[2],
+                            f"{property_name}-left": values[3],
+                        }
+                    )
+                del styles[property_name]
+            return styles
+
+        # Helper function to extract styles for a specific selector
+        def get_styles(selector, properties):
+            styles = {}
+            for rule in stylesheet:
+                if (
+                    rule.type == rule.STYLE_RULE
+                    and rule.selectorText.strip() == selector
+                ):
+                    for prop in rule.style:
+                        if prop.name in properties or any(
+                            prop.name.startswith(p) for p in properties
+                        ):
+                            styles[prop.name] = prop.value
+
+            # Expand shorthand properties
+            styles = expand_shorthand(styles, "margin")
+            styles = expand_shorthand(styles, "padding")
+            return styles
+
+        # Extract relevant styles
+        window_styles = get_styles("#MediaYawn", {"border", "margin", "padding"})
+        icon_styles = get_styles("#MediaYawnIcon", {"border", "margin", "padding"})
+
+        # Resolve shorthand and defaults for window styles
+        window_border = int(
+            window_styles.get("border", "0").split()[0].replace("px", "")
+        )
+        window_padding_left = int(
+            window_styles.get("padding-left", "0").replace("px", "")
+        )
+        window_padding_right = int(
+            window_styles.get("padding-right", "0").replace("px", "")
+        )
+        total_horizontal_window_padding = window_padding_left + window_padding_right
+
+        # Resolve shorthand and defaults for icon styles
+        icon_margin_left = int(icon_styles.get("margin-left", "0").replace("px", ""))
+        icon_margin_right = int(icon_styles.get("margin-right", "0").replace("px", ""))
+        icon_padding_left = int(icon_styles.get("padding-left", "0").replace("px", ""))
+        icon_padding_right = int(
+            icon_styles.get("padding-right", "0").replace("px", "")
+        )
+        icon_border = int(icon_styles.get("border", "0").split()[0].replace("px", ""))
+        total_horizontal_icon_margin = (
+            icon_margin_left
+            + icon_margin_right
+            + icon_padding_left
+            + icon_padding_right
+        )
+
+        # Calculate layout width
+        layout_remaining_width = (
+            self.width()
+            - 2 * window_border
+            - total_horizontal_window_padding
+            - self.icon_size
+            + 2 * icon_border
+            - (total_horizontal_icon_margin if self.icon_size else 0)
+        )
+
+        # Manually set the text container width so the label actually knows
+        # how much it should expand
+        self.text_container.setFixedWidth(layout_remaining_width)
+
+        self.update_text()
+        self.update_bar()
+        self.update_buttons()
+
+    def update_position(self):
+        """
+        Update the position of the notification based on its size and config
+        """
+        offset_x = int(self.config.get("x-offset", 40))
+        offset_y = int(self.config.get("y-offset", -40))
+        corner_width = self.width()
+        corner_height = self.height()
+        screen = self.app.primaryScreen()
+        if offset_x < 0:
+            offset_x = screen.size().width() + offset_x - corner_width
+        if offset_y < 0:
+            offset_y = screen.size().height() + offset_y - corner_height
+        self.move(offset_x, offset_y)
+
+    def close(self):
+        """
+        Close widget and update the position the one
+        stacked on it (if any).
+        """
+        if self in self.app.yawn_arrays[self.yawn_class]:
+            self.app.yawn_arrays[self.yawn_class].remove(self)
         return super().close()

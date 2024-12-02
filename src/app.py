@@ -6,7 +6,7 @@ import subprocess
 from PyQt5.QtCore import QThread, pyqtSignal, QTimer, Qt
 from PyQt5.QtWidgets import QApplication
 from dbus_next.constants import MessageType
-from yawns_notifications import BaseYawn, YawnType, CornerYawn, CenterYawn
+from yawns_notifications import BaseYawn, YawnType, CornerYawn, CenterYawn, MediaYawn
 from yawns_manager import NotificationManager
 from dbus_next.aio import MessageBus
 from dbus_next.message import Message
@@ -162,6 +162,7 @@ class YawnsApp(QApplication):
         self.yawn_arrays = {
             "CornerYawn": [],
             "CenterYawn": [],
+            "MediaYawn": [],
         }
         self.fullscreen_detected = False
 
@@ -173,6 +174,7 @@ class YawnsApp(QApplication):
         self.fullscreen_detected = fullscreen
         min_corner_urgency = CONFIG.getint("corner", "min_urgency", fallback=2)
         min_center_urgency = CONFIG.getint("center", "min_urgency", fallback=2)
+        min_media_urgency = CONFIG.getint("media", "min_urgency", fallback=2)
         for yawn in self.yawn_arrays["CornerYawn"]:
             if yawn.urgency < min_corner_urgency and fullscreen:
                 yawn.hide()
@@ -187,20 +189,38 @@ class YawnsApp(QApplication):
                 yawn.show()
                 yawn.update_position()
 
+        for yawn in self.yawn_arrays["MediaYawn"]:
+            if yawn.urgency < min_center_urgency and fullscreen:
+                yawn.hide()
+            else:
+                yawn.show()
+                yawn.update_position()
+
     def select_yawn_type(self, info_dict):
         """
         Select the yawn type based on the yawn_type hint in info dict
         """
         global CONFIG
         fallback = self.show_corner_yawn
+
+        yawn_type = None
         if "yawn_type" in info_dict["hints"]:
             yawn_type = int(info_dict["hints"]["yawn_type"].value)
-            if yawn_type == YawnType.CORNER.value:
-                self.show_corner_yawn(info_dict)
-            elif yawn_type == YawnType.CENTER.value:
-                self.show_center_yawn(info_dict)
-            else:
-                fallback(info_dict)
+        # Modify yawn_type according to filters in config
+        for yawn_type_value, section in enumerate(["corner", "center", "media"]):
+            print(section, yawn_type_value)
+            for section_filter in ["app_name", "summary", "body"]:
+                filter_value = CONFIG.get(section, section_filter, fallback=None)
+                print(filter_value, info_dict.get(section_filter, None))
+                if filter_value and info_dict.get(section_filter, None) == filter_value:
+                    yawn_type = yawn_type_value + 1
+                    break
+        if yawn_type == YawnType.CORNER.value:
+            self.show_corner_yawn(info_dict)
+        elif yawn_type == YawnType.CENTER.value:
+            self.show_center_yawn(info_dict)
+        elif yawn_type == YawnType.MEDIA.value:
+            self.show_media_yawn(info_dict)
         else:
             fallback(info_dict)
 
@@ -265,18 +285,30 @@ class YawnsApp(QApplication):
         else:
             yawn.show()
 
+    def show_media_yawn(self, info_dict):
+        if self.yawn_arrays["MediaYawn"]:
+            notification = self.yawn_arrays["MediaYawn"][0]
+            notification.info_dict = info_dict
+            notification.update_content()
+            return
+
+        global CONFIG
+        yawn = MediaYawn(self, CONFIG, info_dict)
+        min_urgency = CONFIG.getint("media", "min_urgency", fallback=0)
+        if yawn.urgency < min_urgency and self.fullscreen_detected:
+            pass
+        else:
+            yawn.show()
+
     def close_notification(self, notification_id):
         """
         Close the notification with the given ID
         """
-        for notification in self.yawn_arrays["CornerYawn"]:
-            if notification.info_dict["notification_id"] == notification_id:
-                notification.close()
-                return
-        for notification in self.yawn_arrays["CenterYawn"]:
-            if notification.info_dict["notification_id"] == notification_id:
-                notification.close()
-                return
+        for key in self.yawn_arrays:
+            for notification in self.yawn_arrays[key]:
+                if notification.info_dict["notification_id"] == notification_id:
+                    notification.close()
+                    return
 
 
 def handle_sigint():

@@ -112,3 +112,67 @@
     width: 1px;
     background-color: #FFE001;
 }
+
+#MediaYawn {
+    background-color: rgba(36, 39, 47, 1);
+    border-radius: 20px;
+    border: 5px solid #FFE001;
+    padding: 10px;
+}
+
+#MediaYawnIcon {
+    margin-right: 10px;
+    border-radius: 10px;
+    padding: 10px;
+    background-color: #0F1013;
+}
+
+#MediaYawnTextContainer {
+    background-color: #0F1013;
+    border-radius: 10px;
+    padding: 10px;
+}
+
+#MediaYawnSummary {
+    background-color: rgba(255, 255, 255, 0);
+    font-weight: 700;
+}
+
+#MediaYawnBar {
+    height: 5px;
+    border-radius: 10px;
+    margin-top: 10px;
+    padding: 7.5px;
+    background-color: #0F1013;
+}
+
+#MediaYawnButtonsContainer {
+    background-color: #0F1013;
+    margin-top: 10px;
+    border-radius: 10px;
+    padding: 5px;
+}
+
+#MediaYawnActionButton, #MediaYawnCloseButton {
+    border-radius: 5px;
+    margin: 5px;
+    padding: 5px;
+    background-color: #24272F;
+    border: 2px solid #24272F;
+}
+
+#MediaYawnActionButton:hover, #MediaYawnCloseButton:hover {
+    border-radius: 5px;
+    margin: 5px;
+    padding: 5px;
+    border: 2px solid #ffffff;
+}
+
+#MediaYawnActionButton:pressed, #MediaYawnCloseButton:pressed {
+    border-radius: 5px;
+    margin: 5px;
+    padding: 5px;
+    margin-top: 7px;
+    border: 2px solid #ffffff;
+    margin-bottom: 3px;
+}
