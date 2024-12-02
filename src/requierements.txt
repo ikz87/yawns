@@ -1,4 +1,7 @@
 PyQt5
+dbus-next
+yawns-notifications
+pillow
 cssutils
 python-xlib
-dbus-next
+PyGObject
