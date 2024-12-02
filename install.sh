@@ -15,6 +15,7 @@ install -Dm644 "$program_dir/src/yawns_notifications.py" "/usr/share/$pkgname/ya
 
 # Install assets
 install -Dm644 "$program_dir/assets/yawns-logo.png" "/usr/share/$pkgname/assets/yawns-logo.png"
+install -Dm644 "$program_dir/assets/vinyl.png" "/usr/share/$pkgname/assets/vinyl.png"
 
 # Install configuration and style files to system-wide config directory
 install -Dm644 "$program_dir/src/style.qss" "/usr/share/$pkgname/style.qss"
