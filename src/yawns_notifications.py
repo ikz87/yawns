@@ -21,7 +21,6 @@ from Xlib.display import Display
 from Xlib.Xatom import STRING, ATOM
 import Xlib
 import dbus
-from custom_widgets import SpinningImage
 
 
 class YawnType(Enum):
