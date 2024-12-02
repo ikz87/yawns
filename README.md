@@ -5,8 +5,9 @@
 <h1 align="center"> Your Adaptable Widget Notification System </h1>
 
 <p align="center">
-<img src="https://github.com/user-attachments/assets/7ff3b05a-3ab6-4648-aa1d-158521127096" width=100%> 
+<img src="https://github.com/user-attachments/assets/95a246de-d562-44db-a0e5-d461ca2481b3" width=100%> 
 </p>
+
 
 ## Table of contents
 - [Introduction](#introduction)
