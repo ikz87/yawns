@@ -12,6 +12,7 @@ install -Dm755 "$program_dir/src/app.py" "/usr/share/$pkgname/app.py"  # Correct
 # Install Python files
 install -Dm644 "$program_dir/src/yawns_manager.py" "/usr/share/$pkgname/yawns_manager.py"
 install -Dm644 "$program_dir/src/yawns_notifications.py" "/usr/share/$pkgname/yawns_notifications.py"
+install -Dm644 "$program_dir/src/gtk_helpers.py" "/usr/share/$pkgname/gtk_helpers.py"
 
 # Install assets
 install -Dm644 "$program_dir/assets/yawns-logo.png" "/usr/share/$pkgname/assets/yawns-logo.png"
