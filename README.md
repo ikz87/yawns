@@ -29,6 +29,8 @@ When a notification is received, if the hint `yawn_type` is provided (like when 
 
 There are more yawn types to come but you're more than welcome to open an issue suggesting any cool ideas you might have :)
 
+You can read more about how Yawns work in the [wiki](https://github.com/ikz87/yawns/wiki)
+
 
 # Features
 - Full markup on summary and body
