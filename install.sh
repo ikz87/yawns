@@ -32,4 +32,4 @@ fi
 exec python3 /usr/share/yawns/app.py "$@"' > "/usr/bin/$pkgname"
 chmod +x "/usr/bin/$pkgname"
 
-
+echo "Yawns has been installed. Be sure to also install all the python modules in src/requierements.txt"
