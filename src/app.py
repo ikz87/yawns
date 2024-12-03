@@ -3,6 +3,7 @@ import configparser
 import signal
 import os
 import subprocess
+import fnmatch
 from PyQt5.QtCore import QThread, pyqtSignal, QTimer, Qt
 from PyQt5.QtWidgets import QApplication
 from dbus_next.constants import MessageType
@@ -209,10 +210,18 @@ class YawnsApp(QApplication):
         # Modify yawn_type according to filters in config
         for yawn_type_value, section in enumerate(["corner", "center", "media"]):
             for section_filter in ["app_name", "summary", "body"]:
-                filter_value = CONFIG.get(section, section_filter, fallback=None)
-                if filter_value and info_dict.get(section_filter, None) == filter_value:
-                    yawn_type = yawn_type_value + 1
-                    break
+                filter_values = CONFIG.get(section, section_filter, fallback=None)
+                if not filter_values:
+                    continue
+                filter_values = filter_values.split()
+                for filter_value in filter_values:
+                    notif_value = info_dict.get(section_filter, None)
+                    if not notif_value:
+                        break
+                    print(notif_value, filter_value)
+                    if fnmatch.fnmatch(notif_value, filter_value):
+                        yawn_type = yawn_type_value + 1
+                        break
         if yawn_type == YawnType.CORNER.value:
             self.show_corner_yawn(info_dict)
         elif yawn_type == YawnType.CENTER.value:
