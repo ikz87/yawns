@@ -18,9 +18,22 @@ from Xlib.Xatom import ATOM
 import argparse
 import Xlib
 import Xlib.threaded
+from pywayland.client import Display as WDisplay
+from pywayland.protocol.wayland import WlRegistry
 
+def detect_compositor():
+    display = WDisplay()
+    display.connect()
+    registry = display.get_registry()
 
-class FullscreenMonitor(QThread):
+    compositor_name = None
+
+    # Will finish later
+
+    display.disconnect()
+    return compositor_name or "Unknown Wayland Compositor."
+
+class X11FullscreenMonitor(QThread):
     fullscreen_active = pyqtSignal(bool)
 
     def __init__(self, x11_display):
@@ -173,6 +186,7 @@ class YawnsApp(QApplication):
         """
         global CONFIG
         self.fullscreen_detected = fullscreen
+        print(f"{fullscreen = }")
         min_corner_urgency = CONFIG.getint("corner", "min_urgency", fallback=2)
         min_center_urgency = CONFIG.getint("center", "min_urgency", fallback=2)
         min_media_urgency = CONFIG.getint("media", "min_urgency", fallback=2)
@@ -218,7 +232,6 @@ class YawnsApp(QApplication):
                     notif_value = info_dict.get(section_filter, None)
                     if not notif_value:
                         break
-                    print(notif_value, filter_value)
                     if fnmatch.fnmatch(notif_value, filter_value):
                         yawn_type = yawn_type_value + 1
                         break
@@ -372,6 +385,30 @@ if __name__ == "__main__":
         print("A notification service is already running. Exiting...")
         sys.exit(1)
 
+    # Check the display server
+    server = None
+    if "WAYLAND_DISPLAY" in os.environ:
+        server = "Wayland"
+
+    elif "DISPLAY" in os.environ:
+        try:
+            result = subprocess.run(["xdpyinfo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            if result.returncode == 0:
+                server = "Xorg"
+        except FileNotFoundError:
+            # xdpyinfo is not installed
+            pass
+    if not server:
+        print("Unable to detect the display server (Xorg or Wayland). Exiting...")
+        sys.exit(1)
+
+    # We just exit for now
+    if server == "Wayland":
+        compositor = detect_compositor() # <- unfinished function
+        #print(f"Compositor detected {compositor}")
+        print("Wayland is not supported yet. Exiting...")
+        sys.exit(1)
+
     # CL Arguments
     argparser = argparse.ArgumentParser(
         prog="yawns",
@@ -405,8 +442,8 @@ if __name__ == "__main__":
     CONFIG.read(CONFIG_PATH)
 
     # Initialize the application
-    x11_display = Display()
-    app = YawnsApp(["yawns"], x11_display)
+    display = Display()
+    app = YawnsApp(["yawns"], display)
     app.setQuitOnLastWindowClosed(False)
 
     # Start the NotificationManager in a QThread
@@ -424,7 +461,11 @@ if __name__ == "__main__":
     manager_thread.start()
 
     # Monitor fullscreen changes in a QThread
-    fullscreen_monitor_thread = FullscreenMonitor(x11_display)
+    if server == "Xorg":
+        fullscreen_monitor_thread = X11FullscreenMonitor(display)
+    else:
+        pass
+        # Some logic here to handle each wayland compositor differently
     fullscreen_monitor_thread.fullscreen_active.connect(app.handle_fullscreen_change)
     fullscreen_monitor_thread.start()
 
