@@ -7,12 +7,13 @@ pkgname=yawns
 program_dir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 # Install the main program
-install -Dm755 "$program_dir/src/app.py" "/usr/share/$pkgname/app.py"  # Correct path
+install -Dm755 "$program_dir/src/app.py" "/usr/share/$pkgname/app.py"
 
 # Install Python files
 install -Dm644 "$program_dir/src/yawns_manager.py" "/usr/share/$pkgname/yawns_manager.py"
 install -Dm644 "$program_dir/src/yawns_notifications.py" "/usr/share/$pkgname/yawns_notifications.py"
 install -Dm644 "$program_dir/src/gtk_helpers.py" "/usr/share/$pkgname/gtk_helpers.py"
+install -Dm644 "$program_dir/src/backends/X11.py" "/usr/share/$pkgname/backends/X11.py"
 
 # Install assets
 install -Dm644 "$program_dir/assets/yawns-logo.png" "/usr/share/$pkgname/assets/yawns-logo.png"

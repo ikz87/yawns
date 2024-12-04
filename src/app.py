@@ -11,15 +11,8 @@ from yawns_notifications import BaseYawn, YawnType, CornerYawn, CenterYawn, Medi
 from yawns_manager import NotificationManager
 from dbus_next.aio import MessageBus
 from dbus_next.message import Message
-import asyncio
-from Xlib import X
-from Xlib.display import Display
-from Xlib.Xatom import ATOM
 import argparse
-import Xlib
-import Xlib.threaded
-from pywayland.client import Display as WDisplay
-from pywayland.protocol.wayland import WlRegistry
+import asyncio
 
 def detect_compositor():
     display = WDisplay()
@@ -31,58 +24,7 @@ def detect_compositor():
     # Will finish later
 
     display.disconnect()
-    return compositor_name or "Unknown Wayland Compositor."
-
-class X11FullscreenMonitor(QThread):
-    fullscreen_active = pyqtSignal(bool)
-
-    def __init__(self, x11_display):
-        super().__init__()
-        self.display = x11_display
-
-    def run(self):
-        root = self.display.screen().root
-        screen = self.display.screen()
-
-        # Select the events you want to listen to for the root window
-        root.change_attributes(event_mask=X.FocusChangeMask | X.PropertyChangeMask)
-        self.display.sync()
-
-        # Create a loop to monitor the event queue
-        while True:
-            # Get the next event from the X event queue
-            event = self.display.next_event()
-
-            # Check for window state changes (PropertyNotify)
-            if event.type == X.PropertyNotify:
-                if event.atom == 352:
-                    num_of_fs = 0
-                    for window in root.query_tree()._data["children"]:
-                        self.display.sync()
-                        try:
-                            width = window.get_geometry()._data["width"]
-                            height = window.get_geometry()._data["height"]
-                            # Check if the window is mapped and fullscreen
-                            if window.get_attributes().map_state != 0:
-                                if (
-                                    width == screen.width_in_pixels
-                                    and height == screen.height_in_pixels
-                                ):
-                                    num_of_fs += 1
-                        except Xlib.error.BadDrawable as e:
-                            # Uhhhh
-                            # Ig this is a window that was destroyed?
-                            # Let's just ignore that
-                            pass
-
-                    if num_of_fs > 1:
-                        self.fullscreen_active.emit(True)
-                    else:
-                        self.fullscreen_active.emit(False)
-
-            # Flush the display buffer if needed
-            self.display.sync()
-
+    return compositor_name
 
 class NotificationManagerThread(QThread):
     notification_received = pyqtSignal(dict)
@@ -164,10 +106,10 @@ class YawnsApp(QApplication):
     request_notification_closing = pyqtSignal(int, int, str)
     request_notification_action = pyqtSignal(int, str, str)
 
-    def __init__(self, appname, x11_display):
+    def __init__(self, appname, display_info):
         self.setAttribute(Qt.AA_X11InitThreads)
         super().__init__(appname)
-        self.display = x11_display
+        self.display_info = display_info
         # Use local qss
         self.stylesheet = open(STYLE_PATH, "r").read()
         self.setStyleSheet(self.stylesheet)
@@ -186,7 +128,6 @@ class YawnsApp(QApplication):
         """
         global CONFIG
         self.fullscreen_detected = fullscreen
-        print(f"{fullscreen = }")
         min_corner_urgency = CONFIG.getint("corner", "min_urgency", fallback=2)
         min_center_urgency = CONFIG.getint("center", "min_urgency", fallback=2)
         min_media_urgency = CONFIG.getint("media", "min_urgency", fallback=2)
@@ -387,8 +328,25 @@ if __name__ == "__main__":
 
     # Check the display server
     server = None
+    compositor = None
     if "WAYLAND_DISPLAY" in os.environ:
         server = "Wayland"
+        compositor = detect_compositor() # <- unfinished function
+
+        match compositor:
+            case "sway":
+                pass
+            case "hyprland":
+                pass
+            case None:
+                print(f"Compositor not detected")
+            case _:
+                print(f"Compositor: {compositor} is not supported yet.")
+                sys.exit(2)
+
+        # Placeholder exit message to be removed when Wayland support is added
+        print("Wayland is not supported yet. Exiting...")
+        sys.exit(1)
 
     elif "DISPLAY" in os.environ:
         try:
@@ -400,13 +358,6 @@ if __name__ == "__main__":
             pass
     if not server:
         print("Unable to detect the display server (Xorg or Wayland). Exiting...")
-        sys.exit(1)
-
-    # We just exit for now
-    if server == "Wayland":
-        compositor = detect_compositor() # <- unfinished function
-        #print(f"Compositor detected {compositor}")
-        print("Wayland is not supported yet. Exiting...")
         sys.exit(1)
 
     # CL Arguments
@@ -442,8 +393,19 @@ if __name__ == "__main__":
     CONFIG.read(CONFIG_PATH)
 
     # Initialize the application
-    display = Display()
-    app = YawnsApp(["yawns"], display)
+    # with display server dependent thingies
+    if server == "Xorg":
+        from backends.X11 import FullscreenMonitor, setup_yawn_window
+        from Xlib.display import Display
+
+        display = Display()
+        app = YawnsApp(["yawns"], {"display_server": "Xorg", "X11_display": display})
+        app.setup_yawn_window = setup_yawn_window
+        fullscreen_monitor_thread = FullscreenMonitor(display)
+    else:
+        sys.exit(1)
+    fullscreen_monitor_thread.fullscreen_active.connect(app.handle_fullscreen_change)
+    fullscreen_monitor_thread.start()
     app.setQuitOnLastWindowClosed(False)
 
     # Start the NotificationManager in a QThread
@@ -460,14 +422,6 @@ if __name__ == "__main__":
     manager_thread.notification_closed.connect(app.close_notification)
     manager_thread.start()
 
-    # Monitor fullscreen changes in a QThread
-    if server == "Xorg":
-        fullscreen_monitor_thread = X11FullscreenMonitor(display)
-    else:
-        pass
-        # Some logic here to handle each wayland compositor differently
-    fullscreen_monitor_thread.fullscreen_active.connect(app.handle_fullscreen_change)
-    fullscreen_monitor_thread.start()
 
     # Handle Ctrl+C
     signal.signal(signal.SIGINT, lambda *_: handle_sigint())

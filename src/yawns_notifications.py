@@ -16,10 +16,6 @@ from PyQt5.QtCore import QSize, Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QPainter, QPainterPath, QPixmap
 from enum import Enum
 import time
-from PyQt5.QtX11Extras import QX11Info
-from Xlib.display import Display
-from Xlib.Xatom import STRING, ATOM
-import Xlib
 import dbus
 
 
@@ -52,6 +48,13 @@ class BaseYawn(QWidget):
                 self.info_dict["notification_id"], 1, self.info_dict["sender_id"]
             )
         )
+
+        urgency_struct = self.info_dict["hints"].get("urgency", None)
+        self.urgency = 1
+        if urgency_struct:
+            self.urgency = int(urgency_struct.value)
+
+        self.app.setup_yawn_window(self)
 
     def setup_widgets(self):
         """
@@ -266,53 +269,6 @@ class BaseYawn(QWidget):
     def next_update_position(self):
         pass
 
-    def setup_x11_info(self):
-        """
-        Set up X11 properties for the window,
-        based on the urgency of the notification.
-        """
-        urgency_struct = self.info_dict["hints"].get("urgency", None)
-        self.urgency = 1
-        if urgency_struct:
-            self.urgency = int(urgency_struct.value)
-
-        if QX11Info.isPlatformX11():
-            # Open the X display connection
-            x11_display = self.app.display
-
-            x11_display.sync()
-
-            # Get the window ID
-            wid = int(self.winId())
-            window = x11_display.create_resource_object("window", wid)
-
-            # Get atoms for the required properties
-            WM_CLASS = x11_display.intern_atom("WM_CLASS")
-            _NET_WM_STATE = x11_display.intern_atom("_NET_WM_STATE")
-            _NET_WM_STATE_ABOVE = x11_display.intern_atom("_NET_WM_STATE_ABOVE")
-            _NET_WM_WINDOW_TYPE = x11_display.intern_atom("_NET_WM_WINDOW_TYPE")
-            _NET_WM_WINDOW_TYPE_NOTIFICATION = x11_display.intern_atom(
-                "_NET_WM_WINDOW_TYPE_NOTIFICATION"
-            )
-
-            # Set _NET_WM_STATE to ABOVE for high urgency
-            # (even though that doesn't actually work)
-            if self.urgency == 2:  # High urgency
-                window.change_property(_NET_WM_STATE, ATOM, 32, [_NET_WM_STATE_ABOVE])
-            else:  # Normal or low urgency
-                window.change_property(_NET_WM_STATE, ATOM, 32, [])
-
-            # Set _NET_WM_WINDOW_TYPE to both NOTIFICATION and UTILITY
-            window.change_property(
-                _NET_WM_WINDOW_TYPE, ATOM, 32, [_NET_WM_WINDOW_TYPE_NOTIFICATION]
-            )
-
-            # Set WM_CLASS
-            window.change_property(WM_CLASS, STRING, 8, self.wm_class.encode("utf-8"))
-
-            # Flush the display to apply changes
-            x11_display.sync()
-
     def mousePressEvent(self, a0):
         """
         Handle mouse clicks on the notification
@@ -355,6 +311,7 @@ class CornerYawn(BaseYawn):
             self.config = config["corner"]
         else:
             self.config = {}
+        self.wm_class = "corner - yawn"
         super().__init__(
             app, config, info_dict, parent=parent
         )
@@ -365,7 +322,6 @@ class CornerYawn(BaseYawn):
 
         # Set up window
         self.setWindowTitle("yawns - Corner")
-        self.wm_class = "corner - yawn"
         self.setup_widgets()
         self.icon_label.setAlignment(Qt.AlignCenter)
         self.summary_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -392,7 +348,6 @@ class CornerYawn(BaseYawn):
         self.upper_layout.addLayout(self.icon_layout)
         self.upper_layout.addWidget(self.text_container, stretch=1)
 
-        self.setup_x11_info()
         self.update_content()
 
     def update_content(self):
@@ -574,6 +529,7 @@ class CenterYawn(BaseYawn):
             self.config = config["center"]
         else:
             self.config = {}
+        self.wm_class = "center - yawn"
         super().__init__(
             app, config, info_dict, parent=parent
         )
@@ -583,7 +539,6 @@ class CenterYawn(BaseYawn):
 
         # Set up window
         self.setWindowTitle("yawns - Center")
-        self.wm_class = "center - yawn"
         self.setup_widgets()
 
         self.main_widget.setMinimumWidth(int(self.config.get("width", 220)))
@@ -603,7 +558,6 @@ class CenterYawn(BaseYawn):
         self.main_layout.addWidget(self.text_container, stretch=1)
         self.main_layout.addWidget(self.bar)
 
-        self.setup_x11_info()
         self.update_content()
 
     def update_position(self):
@@ -638,6 +592,7 @@ class MediaYawn(BaseYawn):
             self.config = config["media"]
         else:
             self.config = {}
+        self.wm_class = "media - yawn"
         super().__init__(
             app, config, info_dict, parent=parent
         )
@@ -648,7 +603,6 @@ class MediaYawn(BaseYawn):
 
         # Set up window
         self.setWindowTitle("yawns - Media")
-        self.wm_class = "media - yawn"
         self.setup_widgets()
 
         self.icon_label.setAlignment(Qt.AlignCenter)
@@ -688,7 +642,6 @@ class MediaYawn(BaseYawn):
         self.result_pixmap = None
         self.angle = 0
 
-        self.setup_x11_info()
         self.update_content()
 
     def rotate_icon(self, angle_increment):
