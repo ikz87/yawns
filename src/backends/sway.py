@@ -22,7 +22,13 @@ class FullscreenMonitor(QThread):
         while True:
             line = process.stdout.readline()
             event = json.loads(line)
-            if event.get("fullscreen_mode") == "1":
+            if event.get("container").get("fullscreen_mode") == 1:
                 self.fullscreen_active.emit(True)
             else:
                 self.fullscreen_active.emit(False)
+
+def setup_yawn_window(yawn: BaseYawn):
+    """
+    Set up sway properties for a yawn.
+    """
+    pass

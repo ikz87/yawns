@@ -15,16 +15,18 @@ import argparse
 import asyncio
 
 def detect_compositor():
-    display = WDisplay()
-    display.connect()
-    registry = display.get_registry()
+    global SUPPORTED_COMPOSITORS
+    compositor = ""
+    # Get the list of running processes
+    result = subprocess.run(["ps", "-eo", "comm"], stdout=subprocess.PIPE, text=True, check=True)
+    processes = result.stdout.splitlines()
 
-    compositor_name = None
-
-    # Will finish later
-
-    display.disconnect()
-    return compositor_name
+    # Check for known compositors in the list of processes
+    for process in processes:
+        if process.strip() in SUPPORTED_COMPOSITORS:
+            compositor = process.strip()
+            break
+    return compositor
 
 class NotificationManagerThread(QThread):
     notification_received = pyqtSignal(dict)
@@ -319,7 +321,9 @@ if __name__ == "__main__":
     global STYLE_PATH
     global CONFIG_PATH
     global VERSION
+    global SUPPORTED_COMPOSITORS
     VERSION = "yawns v1.1.0"
+    SUPPORTED_COMPOSITORS = ["sway"]
 
     # Check if a notification service is already running
     if check_notification_service():
@@ -331,22 +335,14 @@ if __name__ == "__main__":
     compositor = None
     if "WAYLAND_DISPLAY" in os.environ:
         server = "Wayland"
-        compositor = detect_compositor() # <- unfinished function
-
-        match compositor:
-            case "sway":
-                pass
-            case "hyprland":
-                pass
-            case None:
-                print(f"Compositor not detected")
-            case _:
-                print(f"Compositor: {compositor} is not supported yet.")
-                sys.exit(2)
-
-        # Placeholder exit message to be removed when Wayland support is added
-        print("Wayland is not supported yet. Exiting...")
-        sys.exit(1)
+        compositor = detect_compositor()
+        if not compositor:
+            print("Compositor not yet supported.")
+            print("Yawns only works with the following compositors: ")
+            for compositor in SUPPORTED_COMPOSITORS:
+                print(f"- {compositor}")
+            print("Exiting...")
+            sys.exit(2)
 
     elif "DISPLAY" in os.environ:
         try:
@@ -358,7 +354,7 @@ if __name__ == "__main__":
             pass
     if not server:
         print("Unable to detect the display server (Xorg or Wayland). Exiting...")
-        sys.exit(1)
+        sys.exit(3)
 
     # CL Arguments
     argparser = argparse.ArgumentParser(
@@ -377,7 +373,7 @@ if __name__ == "__main__":
         # Check if the configuration exists
         if not os.path.isfile(CONFIG_PATH):
             print(f"Configuration file '{CONFIG_PATH}' does not exist. Exiting...")
-            sys.exit(1)
+            sys.exit(4)
     else:
         CONFIG_PATH = CONFIG_DIR + "/config.ini"
     if args.style:
@@ -385,7 +381,7 @@ if __name__ == "__main__":
         # Check if the style exists
         if not os.path.isfile(STYLE_PATH):
             print(f"Style file '{STYLE_PATH}' does not exist. Exiting...")
-            sys.exit(1)
+            sys.exit(5)
     else:
         STYLE_PATH = CONFIG_DIR + "/style.qss"
 
@@ -402,8 +398,14 @@ if __name__ == "__main__":
         app = YawnsApp(["yawns"], {"display_server": "Xorg", "X11_display": display})
         app.setup_yawn_window = setup_yawn_window
         fullscreen_monitor_thread = FullscreenMonitor(display)
+    # We're dealing with Wayland
+    elif compositor == "sway":
+        from backends.sway import FullscreenMonitor, setup_yawn_window
+        app = YawnsApp(["yawns"], {"display_server": "Wayland", "Compositor": "sway"})
+        app.setup_yawn_window = setup_yawn_window
+        fullscreen_monitor_thread = FullscreenMonitor()
     else:
-        sys.exit(1)
+        sys.exit(6)
     fullscreen_monitor_thread.fullscreen_active.connect(app.handle_fullscreen_change)
     fullscreen_monitor_thread.start()
     app.setQuitOnLastWindowClosed(False)
