@@ -663,10 +663,10 @@ class MediaYawn(BaseYawn):
 
         # Translate to the center of the pixmap, rotate, and then draw the original pixmap
         center = self.result_pixmap.rect().center()
-        painter.translate(center)
+        painter.translate(center.x() + 1, center.y() + 1)
         self.angle += angle_increment
         painter.rotate(self.angle)
-        painter.translate(-center)
+        painter.translate(-center.x() - 1, -center.y() - 1)
 
         # Draw the original pixmap
         painter.drawPixmap(0, 0, self.result_pixmap)
@@ -718,8 +718,15 @@ class MediaYawn(BaseYawn):
                 painter.drawPixmap(0, 0, image_pixmap)
                 painter.end()
 
+                vinyl_path = "/usr/share/yawns/assets/vinyl.png"
+                if self.config.get("bg_icon"):
+                    vinyl_path = os.path.expanduser(self.config["bg_icon"])
                 vinyl_pixmap = QPixmap()
-                vinyl_pixmap.load("/usr/share/yawns/assets/vinyl.png")
+                if not vinyl_pixmap.load(vinyl_path):
+                    print(f"Failed to load {vinyl_path} for a media yawn, defaulting to /usr/share/yawns/assets/vinyl.png")
+                    vinyl_path = "/usr/share/yawns/assets/vinyl.png"
+                    vinyl_pixmap.load(vinyl_path)
+
                 vinyl_pixmap = vinyl_pixmap.scaled(
                     self.icon_size,
                     self.icon_size,
