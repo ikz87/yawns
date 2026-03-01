@@ -1,5 +1,5 @@
 import time
-from cssutils import os
+import os
 from dbus_next.constants import MessageType
 from dbus_next.service import ServiceInterface, method, dbus_property, signal
 from dbus_next.aio import MessageBus
@@ -48,11 +48,11 @@ class NotificationManager(ServiceInterface):
 
         def construct_image(image_data):
             image = Image.frombytes(
-                "RGB", 
+                "RGB",
                 (image_data[0], image_data[1]),  # width, height
                 bytes(image_data[6]),  # RGB data (ay) part
-                "raw", 
-                "RGB", 
+                "raw",
+                "RGB",
                 image_data[2],  # rowstride
                 image_data[3],  # channels (3 or 4)
             )
@@ -90,7 +90,9 @@ class NotificationManager(ServiceInterface):
                     except Exception as e:
                         print(f"Error opening image file: {e}")
                 else:
-                    print(f"Provided image-path is neither a valid image or name in a freedesktop.org-compliant icon theme: {image_path}")
+                    print(
+                        f"Provided image-path is neither a valid image or name in a freedesktop.org-compliant icon theme: {image_path}"
+                    )
 
         elif not img_byte_arr and app_icon:
             image_path = app_icon.replace("file://", "")
@@ -109,14 +111,15 @@ class NotificationManager(ServiceInterface):
                     except Exception as e:
                         print(f"Error opening image file: {e}")
                 else:
-                    print(f"Provided app_icon is neither a valid image or name in a freedesktop.org-compliant icon theme: {image_path}")
+                    print(
+                        f"Provided app_icon is neither a valid image or name in a freedesktop.org-compliant icon theme: {image_path}"
+                    )
 
         elif not img_byte_arr and "icon_data" in hints:
             try:
                 img_byte_arr = construct_image(hints["icon_data"].value)
             except Exception as e:
                 print(f"Error loading image: {e}")
-
 
         self.notification_id += 1
         info_dict = {
@@ -130,7 +133,7 @@ class NotificationManager(ServiceInterface):
             "hints": hints,
             "expire_timeout": expire_timeout,
             "sender_id": self.current_sender,
-            "img_byte_arr": img_byte_arr
+            "img_byte_arr": img_byte_arr,
         }
 
         # self.activate_notification(info_dict)

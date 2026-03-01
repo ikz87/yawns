@@ -4,27 +4,26 @@ import signal
 import os
 import subprocess
 import fnmatch
+import argparse
+import asyncio
+from pathlib import Path
+
 from PyQt5.QtCore import QThread, pyqtSignal, QTimer, Qt
 from PyQt5.QtWidgets import QApplication
 from dbus_next.constants import MessageType
-from yawns_notifications import BaseYawn, YawnType, CornerYawn, CenterYawn, MediaYawn
-from yawns_manager import NotificationManager
 from dbus_next.aio import MessageBus
 from dbus_next.message import Message
-import argparse
-import asyncio
+
+from yawns_notifications import BaseYawn, YawnType, CornerYawn, CenterYawn, MediaYawn
+from yawns_manager import NotificationManager
+
+VERSION = "yawns v1.2.0"
+
 
 def detect_compositor():
-    display = WDisplay()
-    display.connect()
-    registry = display.get_registry()
+    # Placeholder for future implementation
+    return None
 
-    compositor_name = None
-
-    # Will finish later
-
-    display.disconnect()
-    return compositor_name
 
 class NotificationManagerThread(QThread):
     notification_received = pyqtSignal(dict)
@@ -49,8 +48,6 @@ class NotificationManagerThread(QThread):
 
     def notify_app(self, info_dict: dict):
         """Emit a PyQt signal when a notification is received."""
-        filtered_dict = {k: v for k, v in info_dict.items() if k != "pixmap_data"}
-        # print(f"Received notification:\n{filtered_dict}")
         self.notification_received.emit(info_dict)
 
     def close_notification(self, id, reason, sender_id):
@@ -106,13 +103,19 @@ class YawnsApp(QApplication):
     request_notification_closing = pyqtSignal(int, int, str)
     request_notification_action = pyqtSignal(int, str, str)
 
-    def __init__(self, appname, display_info):
+    def __init__(self, appname, display_info, config, style_path):
         self.setAttribute(Qt.AA_X11InitThreads)
         super().__init__(appname)
         self.display_info = display_info
-        # Use local qss
-        self.stylesheet = open(STYLE_PATH, "r").read()
-        self.setStyleSheet(self.stylesheet)
+        self.config = config
+
+        # Load stylesheet
+        try:
+            self.stylesheet = Path(style_path).read_text()
+            self.setStyleSheet(self.stylesheet)
+        except Exception as e:
+            print(f"Error reading stylesheet: {e}")
+            self.stylesheet = ""
 
         # Arrays for storing yawns
         self.yawn_arrays = {
@@ -126,46 +129,37 @@ class YawnsApp(QApplication):
         """
         Hide and show yawns depending on urgency and fullscreen state
         """
-        global CONFIG
         self.fullscreen_detected = fullscreen
-        min_corner_urgency = CONFIG.getint("corner", "min_urgency", fallback=2)
-        min_center_urgency = CONFIG.getint("center", "min_urgency", fallback=2)
-        min_media_urgency = CONFIG.getint("media", "min_urgency", fallback=2)
-        for yawn in self.yawn_arrays["CornerYawn"]:
-            if yawn.urgency < min_corner_urgency and fullscreen:
-                yawn.hide()
-            else:
-                yawn.show()
-                yawn.update_position()
+        min_corner_urgency = self.config.getint("corner", "min_urgency", fallback=2)
+        min_center_urgency = self.config.getint("center", "min_urgency", fallback=2)
+        min_media_urgency = self.config.getint("media", "min_urgency", fallback=2)
 
-        for yawn in self.yawn_arrays["CenterYawn"]:
-            if yawn.urgency < min_center_urgency and fullscreen:
-                yawn.hide()
-            else:
-                yawn.show()
-                yawn.update_position()
+        def check_and_toggle(yawn_list, min_urgency):
+            for yawn in yawn_list:
+                if yawn.urgency < min_urgency and fullscreen:
+                    yawn.hide()
+                else:
+                    yawn.show()
+                    yawn.update_position()
 
-        for yawn in self.yawn_arrays["MediaYawn"]:
-            if yawn.urgency < min_center_urgency and fullscreen:
-                yawn.hide()
-            else:
-                yawn.show()
-                yawn.update_position()
+        check_and_toggle(self.yawn_arrays["CornerYawn"], min_corner_urgency)
+        check_and_toggle(self.yawn_arrays["CenterYawn"], min_center_urgency)
+        check_and_toggle(self.yawn_arrays["MediaYawn"], min_media_urgency)
 
     def select_yawn_type(self, info_dict):
         """
         Select the yawn type based on the yawn_type hint in info dict
         """
-        global CONFIG
         fallback = self.show_corner_yawn
-
         yawn_type = None
+
         if "yawn_type" in info_dict["hints"]:
             yawn_type = int(info_dict["hints"]["yawn_type"].value)
+
         # Modify yawn_type according to filters in config
         for yawn_type_value, section in enumerate(["corner", "center", "media"]):
             for section_filter in ["app_name", "summary", "body"]:
-                filter_values = CONFIG.get(section, section_filter, fallback=None)
+                filter_values = self.config.get(section, section_filter, fallback=None)
                 if not filter_values:
                     continue
                 filter_values = filter_values.split()
@@ -176,6 +170,7 @@ class YawnsApp(QApplication):
                     if fnmatch.fnmatch(notif_value, filter_value):
                         yawn_type = yawn_type_value + 1
                         break
+
         if yawn_type == YawnType.CORNER.value:
             self.show_corner_yawn(info_dict)
         elif yawn_type == YawnType.CENTER.value:
@@ -186,8 +181,8 @@ class YawnsApp(QApplication):
             fallback(info_dict)
 
         # Run command after showing the yawn
-        if "general" in CONFIG.sections() and "command" in CONFIG["general"]:
-            command = os.path.expanduser(CONFIG["general"]["command"])
+        if "general" in self.config.sections() and "command" in self.config["general"]:
+            command = os.path.expanduser(self.config["general"]["command"])
             urgency_struct = info_dict["hints"].get("urgency", None)
             urgency = 1
             if urgency_struct:
@@ -207,58 +202,72 @@ class YawnsApp(QApplication):
                 print("Error running command:", command)
                 print(e)
 
+    def _handle_replace(self, info_dict, target_type, other_types):
+        """
+        Handles notification replacement logic.
+        Returns True if the notification was handled (replaced or updated),
+        False if a new notification needs to be created.
+        """
+        if info_dict["replaces_id"] == 0:
+            return False
+
+        # Close matching notifications in other yawn types
+        for type_name in other_types:
+            # Iterate over copy since we might modify list
+            for notif in self.yawn_arrays[type_name][:]:
+                if notif.info_dict["replaces_id"] == info_dict["replaces_id"]:
+                    notif.info_dict = info_dict
+                    notif.close()
+
+        # Update in-place if same type
+        for notif in self.yawn_arrays[target_type]:
+            if notif.info_dict["replaces_id"] == info_dict["replaces_id"]:
+                notif.info_dict = info_dict
+                notif.update_content()
+                return True
+
+        return False
+
     def show_corner_yawn(self, info_dict):
-        # First check the replace id
-        if info_dict["replaces_id"] != 0:
-            for notification in self.yawn_arrays["CenterYawn"]:
-                if notification.info_dict["replaces_id"] == info_dict["replaces_id"]:
-                    notification.info_dict = info_dict
-                    notification.close()
-            for notification in self.yawn_arrays["CornerYawn"]:
-                if notification.info_dict["replaces_id"] == info_dict["replaces_id"]:
-                    notification.info_dict = info_dict
-                    notification.update_content()
-                    return
-        global CONFIG
-        yawn = CornerYawn(self, CONFIG, info_dict)
-        min_urgency = CONFIG.getint("corner", "min_urgency", fallback=0)
-        if yawn.urgency < min_urgency and self.fullscreen_detected:
-            pass
-        else:
+        if self._handle_replace(
+            info_dict, "CornerYawn", ["CenterYawn", "MediaYawn"]
+        ):
+            return
+
+        yawn = CornerYawn(self, self.config, info_dict)
+        min_urgency = self.config.getint("corner", "min_urgency", fallback=0)
+        if not (yawn.urgency < min_urgency and self.fullscreen_detected):
             yawn.show()
 
     def show_center_yawn(self, info_dict):
-        if info_dict["replaces_id"] != 0:
-            for notification in self.yawn_arrays["CornerYawn"]:
-                if notification.info_dict["replaces_id"] == info_dict["replaces_id"]:
-                    notification.info_dict = info_dict
-                    notification.close()
-            for notification in self.yawn_arrays["CenterYawn"]:
-                if notification.info_dict["replaces_id"] == info_dict["replaces_id"]:
-                    notification.info_dict = info_dict
-                    notification.update_content()
-                    return
-        global CONFIG
-        yawn = CenterYawn(self, CONFIG, info_dict)
-        min_urgency = CONFIG.getint("center", "min_urgency", fallback=0)
-        if yawn.urgency < min_urgency and self.fullscreen_detected:
-            pass
-        else:
+        if self._handle_replace(
+            info_dict, "CenterYawn", ["CornerYawn", "MediaYawn"]
+        ):
+            return
+
+        yawn = CenterYawn(self, self.config, info_dict)
+        min_urgency = self.config.getint("center", "min_urgency", fallback=0)
+        if not (yawn.urgency < min_urgency and self.fullscreen_detected):
             yawn.show()
 
     def show_media_yawn(self, info_dict):
+        # Media yawn is unique: it acts as a singleton, replacing the existing one
+        # regardless of ID if one exists, OR it respects the standard replace ID logic.
+        # The original code just checked if *any* MediaYawn existed.
         if self.yawn_arrays["MediaYawn"]:
             notification = self.yawn_arrays["MediaYawn"][0]
             notification.info_dict = info_dict
             notification.update_content()
             return
 
-        global CONFIG
-        yawn = MediaYawn(self, CONFIG, info_dict)
-        min_urgency = CONFIG.getint("media", "min_urgency", fallback=0)
-        if yawn.urgency < min_urgency and self.fullscreen_detected:
-            pass
-        else:
+        # It seems MediaYawn didn't have standard replace logic in the original code,
+        # likely because it forces itself to be a singleton.
+        # We'll stick to the original behavior + handling other types if needed,
+        # but for now, the singleton check above covers it.
+
+        yawn = MediaYawn(self, self.config, info_dict)
+        min_urgency = self.config.getint("media", "min_urgency", fallback=0)
+        if not (yawn.urgency < min_urgency and self.fullscreen_detected):
             yawn.show()
 
     def close_notification(self, notification_id):
@@ -272,164 +281,158 @@ class YawnsApp(QApplication):
                     return
 
 
-def handle_sigint():
+def handle_sigint(manager_thread, app):
     """Handle Ctrl+C to gracefully exit."""
     print("\nCtrl+C pressed. Exiting...")
-    manager_thread.stop()
-    app.quit()
+    if manager_thread:
+        manager_thread.stop()
+    if app:
+        app.quit()
+
 
 def check_notification_service():
     """
     Check if there's already a notification service running
     """
-    # Define the actual asynchronous function
-    async def async_check():
-        # Connect to the session bus
-        bus = await MessageBus().connect()
 
-        # Create a message to call the `GetNameOwner` method
+    async def async_check():
+        bus = await MessageBus().connect()
         message = Message(
             destination="org.freedesktop.DBus",
             path="/org/freedesktop/DBus",
             interface="org.freedesktop.DBus",
             member="GetNameOwner",
             signature="s",
-            body=["org.freedesktop.Notifications"]
+            body=["org.freedesktop.Notifications"],
         )
 
-        # Send the message and get a reply
         reply = await bus.call(message)
 
         if reply.message_type == MessageType.ERROR:
-            # If there's an error, it usually means the name is not owned
             if "org.freedesktop.DBus.Error.NameHasNoOwner" in reply.error_name:
                 return False  # Name is not taken
             else:
                 print(f"An unexpected error occurred: {reply.error_name}")
-                sys.exit(1)  # Exit on unexpected errors
+                sys.exit(1)
         else:
             return True  # Name is taken
 
-    # Run the asynchronous function synchronously
     return asyncio.run(async_check())
 
 
-if __name__ == "__main__":
-    global CONFIG
-    global STYLE_PATH
-    global CONFIG_PATH
-    global VERSION
-    VERSION = "yawns v1.1.0"
+def parse_args():
+    argparser = argparse.ArgumentParser(
+        prog="yawns", description="Your Adaptable Widget Notification System"
+    )
+    argparser.add_argument(
+        "-c", "--config", type=str, default=None, help="Path to the config.ini file"
+    )
+    argparser.add_argument(
+        "-s", "--style", type=str, default=None, help="Path to the style.qss file"
+    )
+    argparser.add_argument("-v", "--version", action="version", version=VERSION)
+    return argparser.parse_args()
 
-    # Check if a notification service is already running
-    if check_notification_service():
-        print("A notification service is already running. Exiting...")
-        sys.exit(1)
 
-    # Check the display server
+def load_config(args):
+    config_dir = os.path.expanduser("~/.config/yawns")
+    config_path = args.config if args.config else f"{config_dir}/config.ini"
+    style_path = args.style if args.style else f"{config_dir}/style.qss"
+
+    if not os.path.isfile(config_path):
+        print(f"Warning: Configuration file '{config_path}' does not exist.")
+
+    if not os.path.isfile(style_path):
+        print(f"Warning: Style file '{style_path}' does not exist.")
+
+    config = configparser.ConfigParser()
+    config.read(config_path)
+    return config, style_path
+
+
+def detect_display_server():
     server = None
     compositor = None
     if "WAYLAND_DISPLAY" in os.environ:
         server = "Wayland"
-        compositor = detect_compositor() # <- unfinished function
-
+        compositor = detect_compositor()
         match compositor:
-            case "sway":
-                pass
-            case "hyprland":
+            case "sway" | "hyprland":
                 pass
             case None:
-                print(f"Compositor not detected")
+                print("Compositor not detected")
             case _:
                 print(f"Compositor: {compositor} is not supported yet.")
                 sys.exit(2)
-
-        # Placeholder exit message to be removed when Wayland support is added
         print("Wayland is not supported yet. Exiting...")
         sys.exit(1)
 
     elif "DISPLAY" in os.environ:
         try:
-            result = subprocess.run(["xdpyinfo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            result = subprocess.run(
+                ["xdpyinfo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            )
             if result.returncode == 0:
                 server = "Xorg"
         except FileNotFoundError:
-            # xdpyinfo is not installed
             pass
+
     if not server:
         print("Unable to detect the display server (Xorg or Wayland). Exiting...")
         sys.exit(1)
 
-    # CL Arguments
-    argparser = argparse.ArgumentParser(
-        prog="yawns",
-        description="Your Adaptable Widget Notification System")
-    argparser.add_argument("-c", "--config", type=str, default=None, help="Path to the config.ini file")
-    argparser.add_argument("-s", "--style", type=str, default=None, help="Path to the style.qss file")
-    argparser.add_argument("-v", "--version", action="version", version=VERSION)
-    args = argparser.parse_args()
+    return server
 
-    # Configuration
-    CONFIG_DIR = os.path.expanduser("~/.config/yawns")
-    if args.config:
-        CONFIG_PATH = args.config
 
-        # Check if the configuration exists
-        if not os.path.isfile(CONFIG_PATH):
-            print(f"Configuration file '{CONFIG_PATH}' does not exist. Exiting...")
-            sys.exit(1)
-    else:
-        CONFIG_PATH = CONFIG_DIR + "/config.ini"
-    if args.style:
-        STYLE_PATH = args.style
-        # Check if the style exists
-        if not os.path.isfile(STYLE_PATH):
-            print(f"Style file '{STYLE_PATH}' does not exist. Exiting...")
-            sys.exit(1)
-    else:
-        STYLE_PATH = CONFIG_DIR + "/style.qss"
+if __name__ == "__main__":
+    if check_notification_service():
+        print("A notification service is already running. Exiting...")
+        sys.exit(1)
 
-    CONFIG = configparser.ConfigParser()
-    CONFIG.read(CONFIG_PATH)
+    args = parse_args()
+    config, style_path = load_config(args)
+    server_type = detect_display_server()
 
-    # Initialize the application
-    # with display server dependent thingies
-    if server == "Xorg":
+    # Initialize app
+    fullscreen_monitor_thread = None
+    app = None
+
+    if server_type == "Xorg":
         from backends.X11 import FullscreenMonitor, setup_yawn_window
         from Xlib.display import Display
 
         display = Display()
-        app = YawnsApp(["yawns"], {"display_server": "Xorg", "X11_display": display})
+        app = YawnsApp(
+            ["yawns"],
+            {"display_server": "Xorg", "X11_display": display},
+            config,
+            style_path,
+        )
         app.setup_yawn_window = setup_yawn_window
         fullscreen_monitor_thread = FullscreenMonitor(display)
+        fullscreen_monitor_thread.fullscreen_active.connect(
+            app.handle_fullscreen_change
+        )
+        fullscreen_monitor_thread.start()
     else:
         sys.exit(1)
-    fullscreen_monitor_thread.fullscreen_active.connect(app.handle_fullscreen_change)
-    fullscreen_monitor_thread.start()
+
     app.setQuitOnLastWindowClosed(False)
 
-    # Start the NotificationManager in a QThread
+    # Start Manager Thread
     manager_thread = NotificationManagerThread()
-
-    # This is cumbersome, but we have to connect signals this way
-    # because all notification closing should also be handled by the
-    # manager primarily
     manager_thread.notification_received.connect(app.select_yawn_type)
-
     app.request_notification_closing.connect(manager_thread.close_notification)
     app.request_notification_action.connect(manager_thread.do_action_on_notification)
-
     manager_thread.notification_closed.connect(app.close_notification)
     manager_thread.start()
 
-
     # Handle Ctrl+C
-    signal.signal(signal.SIGINT, lambda *_: handle_sigint())
+    signal.signal(signal.SIGINT, lambda *_: handle_sigint(manager_thread, app))
     timer = QTimer()
-    timer.timeout.connect(lambda: None)  # Allow the event loop to process signals
+    timer.timeout.connect(lambda: None)  # Allow event loop to process signals
     timer.start(100)
 
-    # Start the PyQt application
     try:
         sys.exit(app.exec_())
     finally:
