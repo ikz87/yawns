@@ -6,6 +6,7 @@ import subprocess
 import fnmatch
 import argparse
 import asyncio
+import setproctitle
 from pathlib import Path
 
 from PyQt5.QtCore import QThread, pyqtSignal, QTimer, Qt
@@ -17,7 +18,13 @@ from dbus_next.message import Message
 from yawns_notifications import BaseYawn, YawnType, CornerYawn, CenterYawn, MediaYawn
 from yawns_manager import NotificationManager
 
-VERSION = "yawns v1.2.0"
+VERSION = "yawns v1.2.1"
+
+try:
+    import setproctitle
+    setproctitle.setproctitle("yawns")
+except ImportError:
+    pass
 
 
 def detect_compositor():

@@ -5,3 +5,4 @@ pillow
 cssutils
 python-xlib
 PyGObject
+setproctitle
