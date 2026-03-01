@@ -136,11 +136,18 @@ class YawnsApp(QApplication):
 
         def check_and_toggle(yawn_list, min_urgency):
             for yawn in yawn_list:
-                if yawn.urgency < min_urgency and fullscreen:
+                should_hide = yawn.urgency < min_urgency and fullscreen
+                
+                if should_hide:
                     yawn.hide()
+                    for clone in yawn.clones:
+                        clone.hide()
                 else:
                     yawn.show()
                     yawn.update_position()
+                    for clone in yawn.clones:
+                        clone.show()
+                        clone.update_position()
 
         check_and_toggle(self.yawn_arrays["CornerYawn"], min_corner_urgency)
         check_and_toggle(self.yawn_arrays["CenterYawn"], min_center_urgency)
@@ -236,7 +243,9 @@ class YawnsApp(QApplication):
 
         yawn = CornerYawn(self, self.config, info_dict)
         min_urgency = self.config.getint("corner", "min_urgency", fallback=0)
-        if not (yawn.urgency < min_urgency and self.fullscreen_detected):
+        
+        should_hide = yawn.urgency < min_urgency and self.fullscreen_detected
+        if not should_hide:
             yawn.show()
 
     def show_center_yawn(self, info_dict):
@@ -247,7 +256,9 @@ class YawnsApp(QApplication):
 
         yawn = CenterYawn(self, self.config, info_dict)
         min_urgency = self.config.getint("center", "min_urgency", fallback=0)
-        if not (yawn.urgency < min_urgency and self.fullscreen_detected):
+        
+        should_hide = yawn.urgency < min_urgency and self.fullscreen_detected
+        if not should_hide:
             yawn.show()
 
     def show_media_yawn(self, info_dict):
@@ -260,14 +271,11 @@ class YawnsApp(QApplication):
             notification.update_content()
             return
 
-        # It seems MediaYawn didn't have standard replace logic in the original code,
-        # likely because it forces itself to be a singleton.
-        # We'll stick to the original behavior + handling other types if needed,
-        # but for now, the singleton check above covers it.
-
         yawn = MediaYawn(self, self.config, info_dict)
         min_urgency = self.config.getint("media", "min_urgency", fallback=0)
-        if not (yawn.urgency < min_urgency and self.fullscreen_detected):
+        
+        should_hide = yawn.urgency < min_urgency and self.fullscreen_detected
+        if not should_hide:
             yawn.show()
 
     def close_notification(self, notification_id):

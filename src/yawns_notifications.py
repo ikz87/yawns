@@ -26,9 +26,24 @@ class BaseYawn(QWidget):
 
     yawn_activated = pyqtSignal(int)
 
-    def __init__(self, app, config, info_dict, parent=None):
+    def __init__(
+        self,
+        app,
+        config,
+        info_dict,
+        parent=None,
+        _clone_for_screen=None,
+        _primary=None,
+    ):
         super().__init__(parent)
         self.yawn_class = type(self).__name__
+        
+        # Clone logic setup
+        self._clone_for_screen = _clone_for_screen
+        self.is_clone = _clone_for_screen is not None
+        self.primary = _primary
+        self.clones = []
+
         if "general" in config:
             self.general_config = config["general"]
         else:
@@ -37,13 +52,18 @@ class BaseYawn(QWidget):
         self.app = app
         self.info_dict = info_dict
         self.setAttribute(Qt.WA_TranslucentBackground)
-        self.timer = QTimer(self)
-        self.timer.setSingleShot(True)
-        self.timer.timeout.connect(
-            lambda: self.app.request_notification_closing.emit(
-                self.info_dict["notification_id"], 1, self.info_dict["sender_id"]
+        
+        # Only the primary yawn manages the close timer
+        if not self.is_clone:
+            self.timer = QTimer(self)
+            self.timer.setSingleShot(True)
+            self.timer.timeout.connect(
+                lambda: self.app.request_notification_closing.emit(
+                    self.info_dict["notification_id"], 1, self.info_dict["sender_id"]
+                )
             )
-        )
+        else:
+            self.timer = None
 
         urgency_struct = self.info_dict["hints"].get("urgency", None)
         self.urgency = 1
@@ -53,9 +73,18 @@ class BaseYawn(QWidget):
         self.app.setup_yawn_window(self)
 
     def get_target_screen(self):
-        """Resolve which QScreen to use based on config."""
+        """Resolve which QScreen to use based on config or clone status."""
+        # If this is a clone, it is assigned a specific screen
+        if self._clone_for_screen:
+            return self._clone_for_screen
+
         monitor = self.config.get("monitor", "primary")
         screens = self.app.screens()
+
+        # If configured for "all" or "-1", the PRIMARY yawn goes to the primary screen.
+        # Clones will be spawned for the others.
+        if str(monitor).lower() in ["all", "-1"]:
+            return self.app.primaryScreen()
 
         if monitor == "focused":
             cursor_pos = QCursor.pos()
@@ -76,6 +105,42 @@ class BaseYawn(QWidget):
             print(f"Invalid monitor value '{monitor}', falling back to primary")
 
         return self.app.primaryScreen()
+
+    def _should_clone(self):
+        """Check if we should spawn clones."""
+        monitor = str(self.config.get("monitor", "primary")).lower()
+        return not self.is_clone and monitor in ["all", "-1"]
+
+    def _spawn_clones(self):
+        """Create clones for all other screens."""
+        if not self._should_clone():
+            return
+        
+        primary_screen = self.get_target_screen()
+        for screen in self.app.screens():
+            if screen != primary_screen:
+                try:
+                    clone = self._create_clone(screen)
+                    self.clones.append(clone)
+                    clone.show()
+                except NotImplementedError:
+                    print(f"Cloning not implemented for {self.yawn_class}")
+
+    def _create_clone(self, screen):
+        """Factory method to be implemented by subclasses."""
+        raise NotImplementedError
+
+    def _update_clones(self):
+        """Propagate content updates to clones."""
+        for clone in self.clones:
+            clone.info_dict = self.info_dict
+            clone.update_content()
+            
+    def _close_clones(self):
+        """Close all associated clones."""
+        for clone in self.clones:
+            clone.close()
+        self.clones.clear()
 
     def setup_widgets(self):
         """
@@ -123,12 +188,6 @@ class BaseYawn(QWidget):
     def setup_side_icon_layout(self):
         """
         Sets up the common layout used by CornerYawn and MediaYawn:
-        - Main Layout (Vertical)
-          - Upper Layout (Horizontal)
-            - Icon Layout (Vertical, aligned top)
-            - Text Container
-          - Bar
-          - Buttons
         """
         self.icon_label.setAlignment(Qt.AlignCenter)
         self.summary_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -160,6 +219,9 @@ class BaseYawn(QWidget):
         """
         Starts/Restarts the timer for closing the yawn.
         """
+        if self.is_clone:
+            return
+
         if self.timer.isActive():
             self.timer.stop()
         timeout = int(self.config.get("timeout", 5250))
@@ -287,7 +349,7 @@ class BaseYawn(QWidget):
     def calculate_text_container_width(self, window_selector, icon_selector):
         """
         Calculates the available width for the text container by parsing the
-        stylesheet and subtracting borders, padding, and margins from the total width.
+        stylesheet.
         """
         # Parse the application stylesheet
         stylesheet = cssutils.parseString(self.app.stylesheet)
@@ -400,6 +462,8 @@ class BaseYawn(QWidget):
         self.update_text()
         self.update_bar()
         self.update_buttons()
+        if not self.is_clone:
+            self._update_clones()
 
     def action_clicked(self, action):
         """
@@ -419,6 +483,8 @@ class BaseYawn(QWidget):
         self.update_position()
         super().show()
         self.next_update_position()
+        if not self.is_clone:
+            self._spawn_clones()
 
     def adjust_size(self):
         self.main_layout.update()
@@ -460,22 +526,52 @@ class BaseYawn(QWidget):
 
 
 class CornerYawn(BaseYawn):
-    def __init__(self, app, config, info_dict, parent=None):
+    def __init__(
+        self,
+        app,
+        config,
+        info_dict,
+        parent=None,
+        _clone_for_screen=None,
+        _primary=None,
+    ):
         if "corner" in config:
             self.config = config["corner"]
         else:
             self.config = {}
+        # Keep reference to full config for cloning
+        self._full_config = config
         self.wm_class = "corner - yawn"
-        super().__init__(app, config, info_dict, parent=parent)
+        super().__init__(
+            app,
+            config,
+            info_dict,
+            parent=parent,
+            _clone_for_screen=_clone_for_screen,
+            _primary=_primary,
+        )
         self.setFixedWidth(int(self.config.get("width", 400)))
         self.setMaximumHeight(int(self.config.get("height", 500)))
-        self.index = len(app.yawn_arrays["CornerYawn"])
-        app.yawn_arrays[self.yawn_class].append(self)
+        
+        if not self.is_clone:
+            self.index = len(app.yawn_arrays["CornerYawn"])
+            app.yawn_arrays[self.yawn_class].append(self)
+        else:
+            self.index = -1
 
         self.setWindowTitle("yawns - Corner")
         self.setup_widgets()
         self.setup_side_icon_layout()
         self.update_content()
+
+    def _create_clone(self, screen):
+        return CornerYawn(
+            self.app,
+            self._full_config,
+            self.info_dict,
+            _clone_for_screen=screen,
+            _primary=self,
+        )
 
     def update_content(self):
         self.restart_timer()
@@ -489,8 +585,24 @@ class CornerYawn(BaseYawn):
         self.update_text()
         self.update_bar()
         self.update_buttons()
+        
+        if not self.is_clone:
+            self._update_clones()
 
     def update_position(self):
+        # Mirror position from primary if this is a clone
+        if self.is_clone and self.primary:
+            p_screen = self.primary.get_target_screen()
+            p_geo = p_screen.geometry()
+            m_geo = self.get_target_screen().geometry()
+            
+            # Calculate relative position
+            rel_x = self.primary.x() - p_geo.x()
+            rel_y = self.primary.y() - p_geo.y()
+            
+            self.move(m_geo.x() + rel_x, m_geo.y() + rel_y)
+            return
+
         offset_x = int(self.config.get("x-offset", -40))
         offset_y = int(self.config.get("y-offset", -40))
         corner_width = self.width()
@@ -511,6 +623,7 @@ class CornerYawn(BaseYawn):
         else:
             offset_y = geo.y() + offset_y
 
+        # Only count other PRIMARIES for stacking, not clones
         yawns_under_self = len(self.app.yawn_arrays["CornerYawn"]) - self.index - 1
         for i in range(yawns_under_self):
             if self.app.yawn_arrays["CornerYawn"][self.index + i + 1].isVisible():
@@ -520,14 +633,20 @@ class CornerYawn(BaseYawn):
                 ) * stacking_direction
 
         self.move(offset_x, offset_y)
+        
+        # After moving, update clones
+        if not self.is_clone:
+            for clone in self.clones:
+                clone.update_position()
 
     def next_update_position(self):
-        if self.index > 0:
+        if not self.is_clone and self.index > 0:
             self.app.yawn_arrays["CornerYawn"][self.index - 1].update_position()
             self.app.yawn_arrays["CornerYawn"][self.index - 1].next_update_position()
 
     def close(self):
-        if self in self.app.yawn_arrays["CornerYawn"]:
+        self._close_clones()
+        if not self.is_clone and self in self.app.yawn_arrays["CornerYawn"]:
             self.app.yawn_arrays["CornerYawn"].remove(self)
             for index in range(len(self.app.yawn_arrays["CornerYawn"])):
                 self.app.yawn_arrays["CornerYawn"][index].index = index
@@ -538,16 +657,35 @@ class CornerYawn(BaseYawn):
 
 
 class CenterYawn(BaseYawn):
-    def __init__(self, app, config, info_dict, parent=None):
+    def __init__(
+        self,
+        app,
+        config,
+        info_dict,
+        parent=None,
+        _clone_for_screen=None,
+        _primary=None,
+    ):
         if "center" in config:
             self.config = config["center"]
         else:
             self.config = {}
+        self._full_config = config
         self.wm_class = "center - yawn"
-        super().__init__(app, config, info_dict, parent=parent)
+        super().__init__(
+            app,
+            config,
+            info_dict,
+            parent=parent,
+            _clone_for_screen=_clone_for_screen,
+            _primary=_primary,
+        )
 
-        self.index = len(app.yawn_arrays["CenterYawn"])
-        app.yawn_arrays[self.yawn_class].append(self)
+        if not self.is_clone:
+            self.index = len(app.yawn_arrays["CenterYawn"])
+            app.yawn_arrays[self.yawn_class].append(self)
+        else:
+            self.index = -1
 
         self.setWindowTitle("yawns - Center")
         self.setup_widgets()
@@ -571,8 +709,18 @@ class CenterYawn(BaseYawn):
 
         self.update_content()
 
+    def _create_clone(self, screen):
+        return CenterYawn(
+            self.app,
+            self._full_config,
+            self.info_dict,
+            _clone_for_screen=screen,
+            _primary=self,
+        )
+
     def update_position(self):
-        super().update_position()
+        # CenterYawn doesn't need complex mirror logic, just center on target screen
+        # super().update_position() # BaseYawn update_position does nothing
         self_width = self.size().width()
         self_height = self.size().height()
         screen = self.get_target_screen()
@@ -580,25 +728,50 @@ class CenterYawn(BaseYawn):
         offset_x = geo.x() + (geo.width() - self_width) // 2
         offset_y = geo.y() + (geo.height() - self_height) // 2
         self.move(offset_x, offset_y)
+        
+        if not self.is_clone:
+            for clone in self.clones:
+                clone.update_position()
 
     def close(self):
-        if self in self.app.yawn_arrays["CenterYawn"]:
+        self._close_clones()
+        if not self.is_clone and self in self.app.yawn_arrays["CenterYawn"]:
             self.app.yawn_arrays["CenterYawn"].remove(self)
         return super().close()
 
 
 class MediaYawn(BaseYawn):
-    def __init__(self, app, config, info_dict, parent=None):
+    def __init__(
+        self,
+        app,
+        config,
+        info_dict,
+        parent=None,
+        _clone_for_screen=None,
+        _primary=None,
+    ):
         if "media" in config:
             self.config = config["media"]
         else:
             self.config = {}
+        self._full_config = config
         self.wm_class = "media - yawn"
-        super().__init__(app, config, info_dict, parent=parent)
+        super().__init__(
+            app,
+            config,
+            info_dict,
+            parent=parent,
+            _clone_for_screen=_clone_for_screen,
+            _primary=_primary,
+        )
         self.setFixedWidth(int(self.config.get("width", 400)))
         self.setMaximumHeight(int(self.config.get("height", 500)))
-        self.index = len(app.yawn_arrays["CornerYawn"])
-        app.yawn_arrays[self.yawn_class].append(self)
+        
+        if not self.is_clone:
+            self.index = len(app.yawn_arrays["CornerYawn"]) # Uses CornerYawn index? Maintained as per original code
+            app.yawn_arrays[self.yawn_class].append(self)
+        else:
+            self.index = -1
 
         self.setWindowTitle("yawns - Media")
         self.setup_widgets()
@@ -613,6 +786,15 @@ class MediaYawn(BaseYawn):
         self.angle = 0
 
         self.update_content()
+
+    def _create_clone(self, screen):
+        return MediaYawn(
+            self.app,
+            self._full_config,
+            self.info_dict,
+            _clone_for_screen=screen,
+            _primary=self,
+        )
 
     def rotate_icon(self, angle_increment):
         if self.result_pixmap is None:
@@ -731,8 +913,22 @@ class MediaYawn(BaseYawn):
         self.update_text()
         self.update_bar()
         self.update_buttons()
+        
+        if not self.is_clone:
+            self._update_clones()
 
     def update_position(self):
+        if self.is_clone and self.primary:
+            p_screen = self.primary.get_target_screen()
+            p_geo = p_screen.geometry()
+            m_geo = self.get_target_screen().geometry()
+            
+            rel_x = self.primary.x() - p_geo.x()
+            rel_y = self.primary.y() - p_geo.y()
+            
+            self.move(m_geo.x() + rel_x, m_geo.y() + rel_y)
+            return
+
         offset_x = int(self.config.get("x-offset", 40))
         offset_y = int(self.config.get("y-offset", -40))
         corner_width = self.width()
@@ -751,8 +947,13 @@ class MediaYawn(BaseYawn):
             offset_y = geo.y() + offset_y
 
         self.move(offset_x, offset_y)
+        
+        if not self.is_clone:
+            for clone in self.clones:
+                clone.update_position()
 
     def close(self):
-        if self in self.app.yawn_arrays[self.yawn_class]:
+        self._close_clones()
+        if not self.is_clone and self in self.app.yawn_arrays[self.yawn_class]:
             self.app.yawn_arrays[self.yawn_class].remove(self)
         return super().close()
