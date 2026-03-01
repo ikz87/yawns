@@ -27,7 +27,7 @@ class NotificationManager(ServiceInterface):
 
     @method()
     def GetServerInformation(self) -> "ssss":
-        return ["yawns", "kz87", "alpha", "0.1"]
+        return ["yawns", "kz87", "alpha", "1.2"]
 
     @method()
     def GetCapabilities(self) -> "as":

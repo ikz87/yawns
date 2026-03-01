@@ -13,7 +13,7 @@ from PyQt5.QtWidgets import (
     QStyle,
 )
 from PyQt5.QtCore import QSize, Qt, QTimer, pyqtSignal
-from PyQt5.QtGui import QPainter, QPainterPath, QPixmap
+from PyQt5.QtGui import QPainter, QPainterPath, QPixmap, QCursor
 from enum import Enum
 import time
 import dbus
@@ -55,6 +55,31 @@ class BaseYawn(QWidget):
             self.urgency = int(urgency_struct.value)
 
         self.app.setup_yawn_window(self)
+
+    def get_target_screen(self):
+        """Resolve which QScreen to use based on config."""
+        monitor = self.config.get("monitor", "primary")
+        screens = self.app.screens()
+
+        if monitor == "focused":
+            cursor_pos = QCursor.pos()
+            for s in screens:
+                if s.geometry().contains(cursor_pos):
+                    return s
+            return self.app.primaryScreen()
+
+        if monitor == "primary":
+            return self.app.primaryScreen()
+
+        try:
+            idx = int(monitor)
+            if 0 <= idx < len(screens):
+                return screens[idx]
+            print(f"Monitor index {idx} out of range, falling back to primary")
+        except ValueError:
+            print(f"Invalid monitor value '{monitor}', falling back to primary")
+
+        return self.app.primaryScreen()
 
     def setup_widgets(self):
         """
@@ -473,27 +498,34 @@ class CornerYawn(BaseYawn):
         self.update_buttons()
 
     def update_position(self):
-        """
-        Update the position of the notification based on its size and config
-        """
         offset_x = int(self.config.get("x-offset", -40))
         offset_y = int(self.config.get("y-offset", -40))
         corner_width = self.width()
         corner_height = self.height()
         gap = int(self.config.get("gap", 10))
         stacking_direction = 1
-        screen = self.app.primaryScreen()
+        screen = self.get_target_screen()
+        geo = screen.geometry()
+
         if offset_x < 0:
-            offset_x = screen.size().width() + offset_x - corner_width
+            offset_x = geo.x() + geo.width() + offset_x - corner_width
+        else:
+            offset_x = geo.x() + offset_x
+
         if offset_y < 0:
-            offset_y = screen.size().height() + offset_y - corner_height
+            offset_y = geo.y() + geo.height() + offset_y - corner_height
             stacking_direction = -1
+        else:
+            offset_y = geo.y() + offset_y
+
         yawns_under_self = len(self.app.yawn_arrays["CornerYawn"]) - self.index - 1
         for i in range(yawns_under_self):
             if self.app.yawn_arrays["CornerYawn"][self.index + i + 1].isVisible():
                 offset_y += (
-                    self.app.yawn_arrays["CornerYawn"][self.index + i + 1].height() + gap
+                    self.app.yawn_arrays["CornerYawn"][self.index + i + 1].height()
+                    + gap
                 ) * stacking_direction
+
         self.move(offset_x, offset_y)
 
     def next_update_position(self):
@@ -561,15 +593,13 @@ class CenterYawn(BaseYawn):
         self.update_content()
 
     def update_position(self):
-        """
-        Update the position of the notification based on its size and config
-        """
         super().update_position()
         self_width = self.size().width()
         self_height = self.size().height()
-        screen = self.app.primaryScreen()
-        offset_x = int((screen.size().width() - self_width) / 2)
-        offset_y = int((screen.size().height() - self_height) / 2)
+        screen = self.get_target_screen()
+        geo = screen.geometry()
+        offset_x = geo.x() + (geo.width() - self_width) // 2
+        offset_y = geo.y() + (geo.height() - self_height) // 2
         self.move(offset_x, offset_y)
 
     def close(self):
@@ -888,18 +918,23 @@ class MediaYawn(BaseYawn):
         self.update_buttons()
 
     def update_position(self):
-        """
-        Update the position of the notification based on its size and config
-        """
         offset_x = int(self.config.get("x-offset", 40))
         offset_y = int(self.config.get("y-offset", -40))
         corner_width = self.width()
         corner_height = self.height()
-        screen = self.app.primaryScreen()
+        screen = self.get_target_screen()
+        geo = screen.geometry()
+
         if offset_x < 0:
-            offset_x = screen.size().width() + offset_x - corner_width
+            offset_x = geo.x() + geo.width() + offset_x - corner_width
+        else:
+            offset_x = geo.x() + offset_x
+
         if offset_y < 0:
-            offset_y = screen.size().height() + offset_y - corner_height
+            offset_y = geo.y() + geo.height() + offset_y - corner_height
+        else:
+            offset_y = geo.y() + offset_y
+
         self.move(offset_x, offset_y)
 
     def close(self):
