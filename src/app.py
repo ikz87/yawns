@@ -18,7 +18,7 @@ from dbus_next.message import Message
 from yawns_notifications import BaseYawn, YawnType, CornerYawn, CenterYawn, MediaYawn
 from yawns_manager import NotificationManager
 
-VERSION = "yawns v1.2.1"
+VERSION = "yawns v1.2.2"
 
 try:
     import setproctitle
