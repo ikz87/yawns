@@ -47,22 +47,30 @@ class NotificationManager(ServiceInterface):
     ) -> "u":
 
         def construct_image(image_data):
+            width = image_data[0]
+            height = image_data[1]
+            rowstride = image_data[2]
+            has_alpha = image_data[3]
+            bits_per_sample = image_data[4]
+            channels = image_data[5]
+            data = bytes(image_data[6])
+
+            # Allow RGBA images (used for discord pfps, haven't seen 
+            # them elsewhere)
+            mode = "RGBA" if has_alpha else "RGB"
+
             image = Image.frombytes(
-                "RGB",
-                (image_data[0], image_data[1]),  # width, height
-                bytes(image_data[6]),  # RGB data (ay) part
+                mode,
+                (width, height),
+                data,
                 "raw",
-                "RGB",
-                image_data[2],  # rowstride
-                image_data[3],  # channels (3 or 4)
+                mode,
+                rowstride,
             )
-            if image_data[3]:  # has_alpha
-                image = image.convert("RGBA")
-            # Save the image as PNG to a BytesIO object
+
             img_byte_arr = io.BytesIO()
             image.save(img_byte_arr, format="PNG")
-            img_byte_arr = img_byte_arr.getvalue()
-            return img_byte_arr
+            return img_byte_arr.getvalue()
 
         # Load the image according to the freedesktop specification
         # See here: https://specifications.freedesktop.org/notification-spec/1.2/icons-and-images.html#icons-and-images-formats
