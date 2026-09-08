@@ -137,13 +137,21 @@ class YawnsApp(QApplication):
         Hide and show yawns depending on urgency and fullscreen state
         """
         self.fullscreen_detected = fullscreen
-        min_corner_urgency = self.config.getint("corner", "min_urgency", fallback=2)
-        min_center_urgency = self.config.getint("center", "min_urgency", fallback=2)
-        min_media_urgency = self.config.getint("media", "min_urgency", fallback=2)
+        
+        # Mapping section names to their respective yawning arrays
+        yawn_sections = {
+            "CornerYawn": "corner",
+            "CenterYawn": "center",
+            "MediaYawn": "media"
+        }
 
-        def check_and_toggle(yawn_list, min_urgency):
+        def check_and_toggle(yawn_list, section_name):
+            # Correctly pull 'fs_urgency' as defined in config.ini
+            min_urgency = self.config.getint(section_name, "fs_urgency", fallback=2)
+            
             for yawn in yawn_list:
-                should_hide = yawn.urgency < min_urgency and fullscreen
+                # If fullscreen, hide if urgency is lower than threshold
+                should_hide = fullscreen and yawn.urgency < min_urgency
                 
                 if should_hide:
                     yawn.hide()
@@ -156,9 +164,8 @@ class YawnsApp(QApplication):
                         clone.show()
                         clone.update_position()
 
-        check_and_toggle(self.yawn_arrays["CornerYawn"], min_corner_urgency)
-        check_and_toggle(self.yawn_arrays["CenterYawn"], min_center_urgency)
-        check_and_toggle(self.yawn_arrays["MediaYawn"], min_media_urgency)
+        for array_name, section in yawn_sections.items():
+            check_and_toggle(self.yawn_arrays[array_name], section)
 
     def select_yawn_type(self, info_dict):
         """
@@ -249,7 +256,7 @@ class YawnsApp(QApplication):
             return
 
         yawn = CornerYawn(self, self.config, info_dict)
-        min_urgency = self.config.getint("corner", "min_urgency", fallback=0)
+        min_urgency = self.config.getint("corner", "fs_urgency", fallback=0)
         
         should_hide = yawn.urgency < min_urgency and self.fullscreen_detected
         if not should_hide:
@@ -262,7 +269,7 @@ class YawnsApp(QApplication):
             return
 
         yawn = CenterYawn(self, self.config, info_dict)
-        min_urgency = self.config.getint("center", "min_urgency", fallback=0)
+        min_urgency = self.config.getint("center", "fs_urgency", fallback=0)
         
         should_hide = yawn.urgency < min_urgency and self.fullscreen_detected
         if not should_hide:
@@ -279,7 +286,7 @@ class YawnsApp(QApplication):
             return
 
         yawn = MediaYawn(self, self.config, info_dict)
-        min_urgency = self.config.getint("media", "min_urgency", fallback=0)
+        min_urgency = self.config.getint("media", "fs_urgency", fallback=0)
         
         should_hide = yawn.urgency < min_urgency and self.fullscreen_detected
         if not should_hide:

@@ -17,49 +17,118 @@ class FullscreenMonitor(QThread):
         super().__init__()
         self.display = x11_display
 
-    def run(self):
-        root = self.display.screen().root
-        screen = self.display.screen()
+        self.root = self.display.screen().root
 
-        # Select the events you want to listen to for the root window
-        root.change_attributes(event_mask=X.FocusChangeMask | X.PropertyChangeMask)
+        self.NET_ACTIVE_WINDOW = self.display.intern_atom(
+            "_NET_ACTIVE_WINDOW"
+        )
+
+        self.NET_WM_STATE = self.display.intern_atom(
+            "_NET_WM_STATE"
+        )
+
+        self.NET_WM_STATE_FULLSCREEN = self.display.intern_atom(
+            "_NET_WM_STATE_FULLSCREEN"
+        )
+
+        self.active_window = None
+        self.last_state = None
+
+    def get_active_window(self):
+        prop = self.root.get_full_property(
+            self.NET_ACTIVE_WINDOW,
+            X.AnyPropertyType
+        )
+
+        if not prop or not prop.value:
+            return None
+
+        return self.display.create_resource_object(
+            "window",
+            prop.value[0]
+        )
+
+    def is_fullscreen(self, window):
+        if window is None:
+            return False
+
+        try:
+            prop = window.get_full_property(
+                self.NET_WM_STATE,
+                X.AnyPropertyType
+            )
+
+            if not prop:
+                return False
+
+            return self.NET_WM_STATE_FULLSCREEN in prop.value
+
+        except Xlib.error.BadWindow:
+            return False
+
+    def update_active_window(self):
+        window = self.get_active_window()
+
+        if window is None:
+            self.active_window = None
+            self.update_state(False)
+            return
+
+        # Listen for _NET_WM_STATE changes on this window.
+        try:
+            window.change_attributes(
+                event_mask=X.PropertyChangeMask
+            )
+        except Xlib.error.BadWindow:
+            return
+
+        self.active_window = window
+
+        self.update_state(
+            self.is_fullscreen(window)
+        )
+
+    def update_state(self, fullscreen):
+        if fullscreen == self.last_state:
+            return
+
+        self.last_state = fullscreen
+        self.fullscreen_active.emit(fullscreen)
+
+
+    def run(self):
+        # Watch root for active-window changes.
+        self.root.change_attributes(
+            event_mask=X.PropertyChangeMask
+        )
+
         self.display.sync()
 
-        # Create a loop to monitor the event queue
-        while True:
-            # Get the next event from the X event queue
+        # Initial state
+        self.update_active_window()
+
+        while not self.isInterruptionRequested():
             event = self.display.next_event()
 
-            # Check for window state changes (PropertyNotify)
-            if event.type == X.PropertyNotify:
-                if event.atom == 352:
-                    num_of_fs = 0
-                    for window in root.query_tree()._data["children"]:
-                        self.display.sync()
-                        try:
-                            width = window.get_geometry()._data["width"]
-                            height = window.get_geometry()._data["height"]
-                            # Check if the window is mapped and fullscreen
-                            if window.get_attributes().map_state != 0:
-                                if (
-                                    width == screen.width_in_pixels
-                                    and height == screen.height_in_pixels
-                                ):
-                                    num_of_fs += 1
-                        except Xlib.error.BadDrawable as e:
-                            # Uhhhh
-                            # Ig this is a window that was destroyed?
-                            # Let's just ignore that
-                            pass
+            if event.type != X.PropertyNotify:
+                continue
 
-                    if num_of_fs > 1:
-                        self.fullscreen_active.emit(True)
-                    else:
-                        self.fullscreen_active.emit(False)
+            # Active application changed
+            if event.window == self.root:
+                if event.atom == self.NET_ACTIVE_WINDOW:
+                    self.update_active_window()
 
-            # Flush the display buffer if needed
+            # Current application's state changed
+            elif (
+                self.active_window is not None
+                and event.window.id == self.active_window.id
+            ):
+                if event.atom == self.NET_WM_STATE:
+                    self.update_state(
+                        self.is_fullscreen(self.active_window)
+                    )
+
             self.display.sync()
-
 
 def setup_yawn_window(yawn: BaseYawn):
     """
