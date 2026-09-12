@@ -11,15 +11,13 @@ from PyQt5.QtWidgets import (
     QFrame,
 )
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
-from PyQt5.QtGui import QPainter, QPainterPath, QPixmap, QCursor
+from PyQt5.QtGui import QCursor
 from enum import Enum
-
 
 class YawnType(Enum):
     CORNER = 1
     CENTER = 2
     MEDIA = 3
-
 
 class BaseYawn(QWidget):
     """Base class for all notification widgets"""
@@ -190,10 +188,10 @@ class BaseYawn(QWidget):
         Sets up the common layout used by CornerYawn and MediaYawn:
         """
         self.icon_label.setAlignment(Qt.AlignCenter)
-        self.summary_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.body_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.summary_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.body_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.bar.setOrientation(Qt.Horizontal)
-        self.text_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.text_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
 
         self.main_layout = QVBoxLayout(self.main_widget)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
@@ -239,6 +237,7 @@ class BaseYawn(QWidget):
         """
         self.icon_size = 0
         if self.info_dict.get("img_byte_arr", None):
+            from PyQt5.QtGui import QPixmap
             image_pixmap = QPixmap()
             if image_pixmap.loadFromData(self.info_dict["img_byte_arr"]):
                 self.icon_size = int(self.config.get("icon-size", 64))
@@ -462,6 +461,9 @@ class BaseYawn(QWidget):
         self.update_text()
         self.update_bar()
         self.update_buttons()
+        self.adjust_size()
+        self.update_position()
+        self.next_update_position()
         if not self.is_clone:
             self._update_clones()
 
@@ -487,8 +489,18 @@ class BaseYawn(QWidget):
             self._spawn_clones()
 
     def adjust_size(self):
-        self.main_layout.update()
-        self.updateGeometry()
+        self.summary_label.adjustSize()
+        self.body_label.adjustSize()
+        self.text_container.adjustSize()
+        if hasattr(self, "header_label"):
+            self.header_label.adjustSize()
+        if hasattr(self, "media_controls_container"):
+            self.media_controls_container.adjustSize()
+        if hasattr(self, "buttons_container"):
+            self.buttons_container.adjustSize()
+        self.main_widget.resize(self.main_widget.width(), 0)
+        self.main_widget.adjustSize()
+        self.resize(self.width(), 0)
         self.adjustSize()
 
     def update_position(self):
@@ -523,437 +535,3 @@ class BaseYawn(QWidget):
             do_actions(self.general_config.get("mouse-right-click", "close"))
         elif a0.button() == Qt.MiddleButton:
             do_actions(self.general_config.get("mouse-middle-click", "close"))
-
-
-class CornerYawn(BaseYawn):
-    def __init__(
-        self,
-        app,
-        config,
-        info_dict,
-        parent=None,
-        _clone_for_screen=None,
-        _primary=None,
-    ):
-        if "corner" in config:
-            self.config = config["corner"]
-        else:
-            self.config = {}
-        # Keep reference to full config for cloning
-        self._full_config = config
-        self.wm_class = "corner - yawn"
-        super().__init__(
-            app,
-            config,
-            info_dict,
-            parent=parent,
-            _clone_for_screen=_clone_for_screen,
-            _primary=_primary,
-        )
-        self.setFixedWidth(int(self.config.get("width", 400)))
-        self.setMaximumHeight(int(self.config.get("height", 500)))
-        
-        if not self.is_clone:
-            self.index = len(app.yawn_arrays["CornerYawn"])
-            app.yawn_arrays[self.yawn_class].append(self)
-        else:
-            self.index = -1
-
-        self.setWindowTitle("yawns - Corner")
-        self.setup_widgets()
-        self.setup_side_icon_layout()
-        self.update_content()
-
-    def _create_clone(self, screen):
-        return CornerYawn(
-            self.app,
-            self._full_config,
-            self.info_dict,
-            _clone_for_screen=screen,
-            _primary=self,
-        )
-
-    def update_content(self):
-        self.restart_timer()
-        self.update_icon()
-
-        layout_remaining_width = self.calculate_text_container_width(
-            "#CornerYawn", "#CornerYawnIcon"
-        )
-        self.text_container.setFixedWidth(layout_remaining_width)
-
-        self.update_text()
-        self.update_bar()
-        self.update_buttons()
-        
-        if not self.is_clone:
-            self._update_clones()
-
-    def update_position(self):
-        # Mirror position from primary if this is a clone
-        if self.is_clone and self.primary:
-            p_screen = self.primary.get_target_screen()
-            p_geo = p_screen.geometry()
-            m_geo = self.get_target_screen().geometry()
-            
-            # Calculate relative position
-            rel_x = self.primary.x() - p_geo.x()
-            rel_y = self.primary.y() - p_geo.y()
-            
-            self.move(m_geo.x() + rel_x, m_geo.y() + rel_y)
-            return
-
-        offset_x = int(self.config.get("x-offset", -40))
-        offset_y = int(self.config.get("y-offset", -40))
-        corner_width = self.width()
-        corner_height = self.height()
-        gap = int(self.config.get("gap", 10))
-        stacking_direction = 1
-        screen = self.get_target_screen()
-        geo = screen.geometry()
-
-        if offset_x < 0:
-            offset_x = geo.x() + geo.width() + offset_x - corner_width
-        else:
-            offset_x = geo.x() + offset_x
-
-        if offset_y < 0:
-            offset_y = geo.y() + geo.height() + offset_y - corner_height
-            stacking_direction = -1
-        else:
-            offset_y = geo.y() + offset_y
-
-        # Only count other PRIMARIES for stacking, not clones
-        yawns_under_self = len(self.app.yawn_arrays["CornerYawn"]) - self.index - 1
-        for i in range(yawns_under_self):
-            if self.app.yawn_arrays["CornerYawn"][self.index + i + 1].isVisible():
-                offset_y += (
-                    self.app.yawn_arrays["CornerYawn"][self.index + i + 1].height()
-                    + gap
-                ) * stacking_direction
-
-        self.move(offset_x, offset_y)
-        
-        # After moving, update clones
-        if not self.is_clone:
-            for clone in self.clones:
-                clone.update_position()
-
-    def next_update_position(self):
-        if not self.is_clone and self.index > 0:
-            self.app.yawn_arrays["CornerYawn"][self.index - 1].update_position()
-            self.app.yawn_arrays["CornerYawn"][self.index - 1].next_update_position()
-
-    def close(self):
-        self._close_clones()
-        if not self.is_clone and self in self.app.yawn_arrays["CornerYawn"]:
-            self.app.yawn_arrays["CornerYawn"].remove(self)
-            for index in range(len(self.app.yawn_arrays["CornerYawn"])):
-                self.app.yawn_arrays["CornerYawn"][index].index = index
-            if self.app.yawn_arrays["CornerYawn"]:
-                self.app.yawn_arrays["CornerYawn"][-1].update_position()
-                self.app.yawn_arrays["CornerYawn"][-1].next_update_position()
-        return super().close()
-
-
-class CenterYawn(BaseYawn):
-    def __init__(
-        self,
-        app,
-        config,
-        info_dict,
-        parent=None,
-        _clone_for_screen=None,
-        _primary=None,
-    ):
-        if "center" in config:
-            self.config = config["center"]
-        else:
-            self.config = {}
-        self._full_config = config
-        self.wm_class = "center - yawn"
-        super().__init__(
-            app,
-            config,
-            info_dict,
-            parent=parent,
-            _clone_for_screen=_clone_for_screen,
-            _primary=_primary,
-        )
-
-        if not self.is_clone:
-            self.index = len(app.yawn_arrays["CenterYawn"])
-            app.yawn_arrays[self.yawn_class].append(self)
-        else:
-            self.index = -1
-
-        self.setWindowTitle("yawns - Center")
-        self.setup_widgets()
-
-        self.main_widget.setMinimumWidth(int(self.config.get("width", 220)))
-        self.main_widget.setMaximumHeight(int(self.config.get("height", 220)))
-        self.icon_label.setAlignment(Qt.AlignCenter)
-        self.summary_label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
-        self.summary_label.setAlignment(Qt.AlignCenter)
-        self.body_label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
-        self.body_label.setAlignment(Qt.AlignCenter)
-        self.bar.setOrientation(Qt.Horizontal)
-
-        self.main_layout = QVBoxLayout(self.main_widget)
-        self.main_layout.setSpacing(0)
-        self.main_layout.setContentsMargins(0, 0, 0, 0)
-
-        self.main_layout.addWidget(self.icon_label, stretch=1)
-        self.main_layout.addWidget(self.text_container, stretch=1)
-        self.main_layout.addWidget(self.bar)
-
-        self.update_content()
-
-    def _create_clone(self, screen):
-        return CenterYawn(
-            self.app,
-            self._full_config,
-            self.info_dict,
-            _clone_for_screen=screen,
-            _primary=self,
-        )
-
-    def update_position(self):
-        # CenterYawn doesn't need complex mirror logic, just center on target screen
-        # super().update_position() # BaseYawn update_position does nothing
-        self_width = self.size().width()
-        self_height = self.size().height()
-        screen = self.get_target_screen()
-        geo = screen.geometry()
-        offset_x = geo.x() + (geo.width() - self_width) // 2
-        offset_y = geo.y() + (geo.height() - self_height) // 2
-        self.move(offset_x, offset_y)
-        
-        if not self.is_clone:
-            for clone in self.clones:
-                clone.update_position()
-
-    def close(self):
-        self._close_clones()
-        if not self.is_clone and self in self.app.yawn_arrays["CenterYawn"]:
-            self.app.yawn_arrays["CenterYawn"].remove(self)
-        return super().close()
-
-
-class MediaYawn(BaseYawn):
-    def __init__(
-        self,
-        app,
-        config,
-        info_dict,
-        parent=None,
-        _clone_for_screen=None,
-        _primary=None,
-    ):
-        if "media" in config:
-            self.config = config["media"]
-        else:
-            self.config = {}
-        self._full_config = config
-        self.wm_class = "media - yawn"
-        super().__init__(
-            app,
-            config,
-            info_dict,
-            parent=parent,
-            _clone_for_screen=_clone_for_screen,
-            _primary=_primary,
-        )
-        self.setFixedWidth(int(self.config.get("width", 400)))
-        self.setMaximumHeight(int(self.config.get("height", 500)))
-        
-        if not self.is_clone:
-            self.index = len(app.yawn_arrays["CornerYawn"]) # Uses CornerYawn index? Maintained as per original code
-            app.yawn_arrays[self.yawn_class].append(self)
-        else:
-            self.index = -1
-
-        self.setWindowTitle("yawns - Media")
-        self.setup_widgets()
-        self.setup_side_icon_layout()
-
-        # Timer for rotating the icon
-        self.icon_timer = QTimer()
-        fps = int(self.config.get("fps", 30))
-        self.icon_timer.setInterval(round(1000 / fps))
-        self.icon_timer.timeout.connect(lambda: self.rotate_icon(5))
-        self.result_pixmap = None
-        self.angle = 0
-
-        self.update_content()
-
-    def _create_clone(self, screen):
-        return MediaYawn(
-            self.app,
-            self._full_config,
-            self.info_dict,
-            _clone_for_screen=screen,
-            _primary=self,
-        )
-
-    def rotate_icon(self, angle_increment):
-        if self.result_pixmap is None:
-            return
-        rotated_pixmap = QPixmap(self.result_pixmap.size())
-        rotated_pixmap.fill(Qt.transparent)
-
-        painter = QPainter(rotated_pixmap)
-        painter.setRenderHint(QPainter.Antialiasing)
-        painter.setRenderHint(QPainter.SmoothPixmapTransform)
-
-        center = self.result_pixmap.rect().center()
-        painter.translate(center.x() + 1, center.y() + 1)
-        self.angle += angle_increment
-        painter.rotate(self.angle)
-        painter.translate(-center.x() - 1, -center.y() - 1)
-
-        painter.drawPixmap(0, 0, self.result_pixmap)
-        painter.end()
-        self.icon_label.setPixmap(rotated_pixmap)
-
-    def update_icon(self):
-        """
-        Update the spinning image on top of the vynil icon_label
-        """
-        self.icon_size = 0
-        if self.info_dict.get("img_byte_arr", None):
-            image_pixmap = QPixmap()
-            if image_pixmap.loadFromData(self.info_dict["img_byte_arr"]):
-                self.icon_size = int(self.config.get("icon-size", 64))
-                # Crop the image to a square
-                original_width = image_pixmap.width()
-                original_height = image_pixmap.height()
-                size = min(original_width, original_height)
-                rect = (
-                    (original_width - size) // 2,
-                    (original_height - size) // 2,
-                    size,
-                    size,
-                )
-                image_pixmap = image_pixmap.copy(*rect)
-
-                scaled_size = round(self.icon_size * 0.5)
-                # Scale the cropped square
-                image_pixmap = image_pixmap.scaled(
-                    scaled_size,
-                    scaled_size,
-                    Qt.KeepAspectRatioByExpanding,
-                    Qt.SmoothTransformation,
-                )
-
-                # Create a rounded pixmap
-                rounded_pixmap = QPixmap(scaled_size, scaled_size)
-                rounded_pixmap.fill(Qt.transparent)
-
-                painter = QPainter(rounded_pixmap)
-                painter.setRenderHint(QPainter.Antialiasing)
-                path = QPainterPath()
-                path.addEllipse(0, 0, scaled_size, scaled_size)
-                painter.setClipPath(path)
-                painter.drawPixmap(0, 0, image_pixmap)
-                painter.end()
-
-                vinyl_path = "/usr/share/yawns/assets/vinyl.png"
-                if self.config.get("bg_icon"):
-                    vinyl_path = os.path.expanduser(self.config["bg_icon"])
-                vinyl_pixmap = QPixmap()
-                if not vinyl_pixmap.load(vinyl_path):
-                    print(
-                        f"Failed to load {vinyl_path} for a media yawn, defaulting to /usr/share/yawns/assets/vinyl.png"
-                    )
-                    vinyl_path = "/usr/share/yawns/assets/vinyl.png"
-                    vinyl_pixmap.load(vinyl_path)
-
-                vinyl_pixmap = vinyl_pixmap.scaled(
-                    self.icon_size,
-                    self.icon_size,
-                    Qt.IgnoreAspectRatio,
-                    Qt.SmoothTransformation,
-                )
-                self.result_pixmap = QPixmap(vinyl_pixmap.size())
-                self.result_pixmap.fill(Qt.transparent)
-
-                painter = QPainter(self.result_pixmap)
-                painter.setRenderHint(QPainter.Antialiasing)
-                painter.drawPixmap(0, 0, vinyl_pixmap)
-
-                x = (vinyl_pixmap.width() - rounded_pixmap.width()) // 2
-                y = (vinyl_pixmap.height() - rounded_pixmap.height()) // 2
-                painter.drawPixmap(x, y, rounded_pixmap)
-                painter.end()
-
-                self.icon_label.setPixmap(self.result_pixmap)
-                self.icon_label.setMinimumSize(0, 0)
-                self.icon_label.setMaximumSize(100000, 100000)
-
-                self.icon_timer.start()
-            else:
-                self.result_pixmap = None
-                self.icon_label.clear()
-                self.icon_label.setFixedSize(0, 0)
-        else:
-            self.result_pixmap = None
-            self.icon_label.clear()
-            self.icon_label.setFixedSize(0, 0)
-
-    def update_content(self):
-        self.restart_timer()
-        self.update_icon()
-
-        layout_remaining_width = self.calculate_text_container_width(
-            "#MediaYawn", "#MediaYawnIcon"
-        )
-        self.text_container.setFixedWidth(layout_remaining_width)
-
-        self.update_text()
-        self.update_bar()
-        self.update_buttons()
-        
-        if not self.is_clone:
-            self._update_clones()
-
-    def update_position(self):
-        if self.is_clone and self.primary:
-            p_screen = self.primary.get_target_screen()
-            p_geo = p_screen.geometry()
-            m_geo = self.get_target_screen().geometry()
-            
-            rel_x = self.primary.x() - p_geo.x()
-            rel_y = self.primary.y() - p_geo.y()
-            
-            self.move(m_geo.x() + rel_x, m_geo.y() + rel_y)
-            return
-
-        offset_x = int(self.config.get("x-offset", 40))
-        offset_y = int(self.config.get("y-offset", -40))
-        corner_width = self.width()
-        corner_height = self.height()
-        screen = self.get_target_screen()
-        geo = screen.geometry()
-
-        if offset_x < 0:
-            offset_x = geo.x() + geo.width() + offset_x - corner_width
-        else:
-            offset_x = geo.x() + offset_x
-
-        if offset_y < 0:
-            offset_y = geo.y() + geo.height() + offset_y - corner_height
-        else:
-            offset_y = geo.y() + offset_y
-
-        self.move(offset_x, offset_y)
-        
-        if not self.is_clone:
-            for clone in self.clones:
-                clone.update_position()
-
-    def close(self):
-        self._close_clones()
-        if not self.is_clone and self in self.app.yawn_arrays[self.yawn_class]:
-            self.app.yawn_arrays[self.yawn_class].remove(self)
-        return super().close()

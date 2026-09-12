@@ -176,3 +176,37 @@
     border: 2px solid #ffffff;
     margin-bottom: 3px;
 }
+
+#MediaYawnHeader {
+    font-size: 13px;
+    font-weight: 400;
+    color: #888888;
+    margin-bottom: 5px;
+    margin-top: 5px;
+}
+
+#MediaYawnControls {
+    background-color: #0F1013;
+    margin-top: 10px;
+    border-radius: 10px;
+    padding: 5px;
+}
+
+#MediaYawnControlButton {
+    border-radius: 5px;
+    margin: 5px;
+    padding: 8px 16px;
+    background-color: #24272F;
+    border: 2px solid #24272F;
+    font-size: 18px;
+}
+
+#MediaYawnControlButton:hover {
+    border: 2px solid #ffffff;
+}
+
+#MediaYawnControlButton:pressed {
+    margin-top: 7px;
+    margin-bottom: 3px;
+    border: 2px solid #ffffff;
+}
