@@ -1,5 +1,5 @@
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QVBoxLayout, QSizePolicy
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QVBoxLayout, QSizePolicy
 from yawns_notifications.base import BaseYawn
 
 class CenterYawn(BaseYawn):
@@ -38,12 +38,12 @@ class CenterYawn(BaseYawn):
 
         self.main_widget.setMinimumWidth(int(self.config.get("width", 220)))
         self.main_widget.setMaximumHeight(int(self.config.get("height", 220)))
-        self.icon_label.setAlignment(Qt.AlignCenter)
-        self.summary_label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
-        self.summary_label.setAlignment(Qt.AlignCenter)
-        self.body_label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
-        self.body_label.setAlignment(Qt.AlignCenter)
-        self.bar.setOrientation(Qt.Horizontal)
+        self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.summary_label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
+        self.summary_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.body_label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
+        self.body_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.bar.setOrientation(Qt.Orientation.Horizontal)
 
         self.main_layout = QVBoxLayout(self.main_widget)
         self.main_layout.setSpacing(0)

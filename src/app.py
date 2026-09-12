@@ -9,8 +9,8 @@ import asyncio
 import setproctitle
 from pathlib import Path
 
-from PyQt5.QtCore import QThread, pyqtSignal, QTimer, Qt
-from PyQt5.QtWidgets import QApplication
+from PyQt6.QtCore import QThread, pyqtSignal, QTimer, Qt
+from PyQt6.QtWidgets import QApplication
 from dbus_next.constants import MessageType
 from dbus_next.aio import MessageBus
 from dbus_next.message import Message
@@ -111,7 +111,6 @@ class YawnsApp(QApplication):
     request_notification_action = pyqtSignal(int, str, str)
 
     def __init__(self, appname, display_info, config, style_path):
-        self.setAttribute(Qt.AA_X11InitThreads)
         super().__init__(appname)
         self.display_info = display_info
         self.config = config
@@ -456,6 +455,6 @@ if __name__ == "__main__":
     timer.start(100)
 
     try:
-        sys.exit(app.exec_())
+        sys.exit(app.exec())
     finally:
         manager_thread.stop()

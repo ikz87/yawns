@@ -1,14 +1,14 @@
 import os
 import subprocess
-from PyQt5.QtWidgets import (
+from PyQt6.QtWidgets import (
     QHBoxLayout,
     QPushButton,
     QSizePolicy,
     QLabel,
     QFrame,
 )
-from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QPainter, QPainterPath, QPixmap
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QPainter, QPainterPath, QPixmap
 from yawns_notifications.base import BaseYawn
 
 class MediaYawn(BaseYawn):
@@ -110,7 +110,7 @@ class MediaYawn(BaseYawn):
         self.is_playing = True
         self.header_label = QLabel("Now playing...")
         self.header_label.setObjectName("MediaYawnHeader")
-        self.header_label.setAlignment(Qt.AlignCenter)
+        self.header_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.media_controls_container = QFrame()
         self.media_controls_container.setObjectName("MediaYawnControls")
@@ -120,21 +120,21 @@ class MediaYawn(BaseYawn):
 
         self.prev_button = QPushButton("⏮")
         self.prev_button.setObjectName("MediaYawnControlButton")
-        self.prev_button.setCursor(Qt.PointingHandCursor)
+        self.prev_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.prev_button.clicked.connect(self._previous_clicked)
 
         self.play_pause_button = QPushButton("⏸")
         self.play_pause_button.setObjectName("MediaYawnControlButton")
-        self.play_pause_button.setCursor(Qt.PointingHandCursor)
+        self.play_pause_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.play_pause_button.clicked.connect(self._play_pause_clicked)
 
         self.next_button = QPushButton("⏭")
         self.next_button.setObjectName("MediaYawnControlButton")
-        self.next_button.setCursor(Qt.PointingHandCursor)
+        self.next_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.next_button.clicked.connect(self._next_clicked)
 
         for button in (self.prev_button, self.play_pause_button, self.next_button):
-            button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+            button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
         self.media_controls_layout.addWidget(self.prev_button)
         self.media_controls_layout.addWidget(self.play_pause_button)
@@ -144,9 +144,9 @@ class MediaYawn(BaseYawn):
     def setup_side_icon_layout(self):
         """Override to add header and media controls."""
         super().setup_side_icon_layout()
-        self.header_label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+        self.header_label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
         self.media_controls_container.setSizePolicy(
-            QSizePolicy.Expanding, QSizePolicy.Fixed
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
         )
         self.main_layout.insertWidget(0, self.header_label)
         self.main_layout.insertWidget(3, self.media_controls_container)
@@ -164,11 +164,11 @@ class MediaYawn(BaseYawn):
         if self.result_pixmap is None:
             return
         rotated_pixmap = QPixmap(self.result_pixmap.size())
-        rotated_pixmap.fill(Qt.transparent)
+        rotated_pixmap.fill(Qt.GlobalColor.transparent)
 
         painter = QPainter(rotated_pixmap)
-        painter.setRenderHint(QPainter.Antialiasing)
-        painter.setRenderHint(QPainter.SmoothPixmapTransform)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
 
         center = self.result_pixmap.rect().center()
         painter.translate(center.x() + 1, center.y() + 1)
@@ -211,16 +211,16 @@ class MediaYawn(BaseYawn):
                 image_pixmap = image_pixmap.scaled(
                     scaled_size,
                     scaled_size,
-                    Qt.KeepAspectRatioByExpanding,
-                    Qt.SmoothTransformation,
+                    Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                    Qt.TransformationMode.SmoothTransformation,
                 )
 
                 # Create a rounded pixmap
                 rounded_pixmap = QPixmap(scaled_size, scaled_size)
-                rounded_pixmap.fill(Qt.transparent)
+                rounded_pixmap.fill(Qt.GlobalColor.transparent)
 
                 painter = QPainter(rounded_pixmap)
-                painter.setRenderHint(QPainter.Antialiasing)
+                painter.setRenderHint(QPainter.RenderHint.Antialiasing)
                 path = QPainterPath()
                 path.addEllipse(0, 0, scaled_size, scaled_size)
                 painter.setClipPath(path)
@@ -247,14 +247,14 @@ class MediaYawn(BaseYawn):
         vinyl_pixmap = vinyl_pixmap.scaled(
             self.icon_size,
             self.icon_size,
-            Qt.IgnoreAspectRatio,
-            Qt.SmoothTransformation,
+            Qt.AspectRatioMode.IgnoreAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
         )
         self.result_pixmap = QPixmap(vinyl_pixmap.size())
-        self.result_pixmap.fill(Qt.transparent)
+        self.result_pixmap.fill(Qt.GlobalColor.transparent)
 
         painter = QPainter(self.result_pixmap)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.drawPixmap(0, 0, vinyl_pixmap)
 
         if rounded_pixmap is not None:

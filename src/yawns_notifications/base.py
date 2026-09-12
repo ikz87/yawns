@@ -1,6 +1,6 @@
 import os
 import cssutils
-from PyQt5.QtWidgets import (
+from PyQt6.QtWidgets import (
     QProgressBar,
     QHBoxLayout,
     QPushButton,
@@ -10,8 +10,8 @@ from PyQt5.QtWidgets import (
     QLabel,
     QFrame,
 )
-from PyQt5.QtCore import Qt, QTimer, pyqtSignal
-from PyQt5.QtGui import QCursor
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
+from PyQt6.QtGui import QCursor
 from enum import Enum
 
 class YawnType(Enum):
@@ -34,6 +34,11 @@ class BaseYawn(QWidget):
         _primary=None,
     ):
         super().__init__(parent)
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint
+            | Qt.WindowType.WindowStaysOnTopHint
+            | Qt.WindowType.X11BypassWindowManagerHint
+        )
         self.yawn_class = type(self).__name__
         
         # Clone logic setup
@@ -49,7 +54,7 @@ class BaseYawn(QWidget):
 
         self.app = app
         self.info_dict = info_dict
-        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         
         # Only the primary yawn manages the close timer
         if not self.is_clone:
@@ -187,11 +192,11 @@ class BaseYawn(QWidget):
         """
         Sets up the common layout used by CornerYawn and MediaYawn:
         """
-        self.icon_label.setAlignment(Qt.AlignCenter)
-        self.summary_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self.body_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self.bar.setOrientation(Qt.Horizontal)
-        self.text_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.summary_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        self.body_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        self.bar.setOrientation(Qt.Orientation.Horizontal)
+        self.text_container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
 
         self.main_layout = QVBoxLayout(self.main_widget)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
@@ -237,15 +242,15 @@ class BaseYawn(QWidget):
         """
         self.icon_size = 0
         if self.info_dict.get("img_byte_arr", None):
-            from PyQt5.QtGui import QPixmap
+            from PyQt6.QtGui import QPixmap
             image_pixmap = QPixmap()
             if image_pixmap.loadFromData(self.info_dict["img_byte_arr"]):
                 self.icon_size = int(self.config.get("icon-size", 64))
                 image_pixmap = image_pixmap.scaled(
                     self.icon_size,
                     self.icon_size,
-                    Qt.KeepAspectRatio,
-                    Qt.SmoothTransformation,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation,
                 )
                 self.icon_label.setPixmap(image_pixmap)
                 self.icon_label.setMinimumSize(0, 0)
