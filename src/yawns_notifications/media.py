@@ -182,13 +182,18 @@ class MediaYawn(BaseYawn):
 
     def update_icon(self):
         """
-        Update the spinning image on top of the vynil icon_label
+        Update the spinning image on top of the vinyl icon_label.
+
+        The vinyl is always rendered (and spins) even when no cover art is
+        available; in that case only the bare vinyl is shown.
         """
-        self.icon_size = 0
-        if self.info_dict.get("img_byte_arr", None):
+        self.icon_size = int(self.config.get("icon-size", 64))
+
+        rounded_pixmap = None
+        img_bytes = self.info_dict.get("img_byte_arr", None)
+        if img_bytes:
             image_pixmap = QPixmap()
-            if image_pixmap.loadFromData(self.info_dict["img_byte_arr"]):
-                self.icon_size = int(self.config.get("icon-size", 64))
+            if image_pixmap.loadFromData(img_bytes):
                 # Crop the image to a square
                 original_width = image_pixmap.width()
                 original_height = image_pixmap.height()
@@ -222,48 +227,47 @@ class MediaYawn(BaseYawn):
                 painter.drawPixmap(0, 0, image_pixmap)
                 painter.end()
 
-                vinyl_path = "/usr/share/yawns/assets/vinyl.png"
-                if self.config.get("bg_icon"):
-                    vinyl_path = os.path.expanduser(self.config["bg_icon"])
-                vinyl_pixmap = QPixmap()
-                if not vinyl_pixmap.load(vinyl_path):
-                    print(
-                        f"Failed to load {vinyl_path} for a media yawn, defaulting to /usr/share/yawns/assets/vinyl.png"
-                    )
-                    vinyl_path = "/usr/share/yawns/assets/vinyl.png"
-                    vinyl_pixmap.load(vinyl_path)
+        vinyl_path = "/usr/share/yawns/assets/vinyl.png"
+        if self.config.get("bg_icon"):
+            vinyl_path = os.path.expanduser(self.config["bg_icon"])
+        vinyl_pixmap = QPixmap()
+        if not vinyl_pixmap.load(vinyl_path):
+            print(
+                f"Failed to load {vinyl_path} for a media yawn, defaulting to /usr/share/yawns/assets/vinyl.png"
+            )
+            vinyl_path = "/usr/share/yawns/assets/vinyl.png"
+            vinyl_pixmap.load(vinyl_path)
 
-                vinyl_pixmap = vinyl_pixmap.scaled(
-                    self.icon_size,
-                    self.icon_size,
-                    Qt.IgnoreAspectRatio,
-                    Qt.SmoothTransformation,
-                )
-                self.result_pixmap = QPixmap(vinyl_pixmap.size())
-                self.result_pixmap.fill(Qt.transparent)
-
-                painter = QPainter(self.result_pixmap)
-                painter.setRenderHint(QPainter.Antialiasing)
-                painter.drawPixmap(0, 0, vinyl_pixmap)
-
-                x = (vinyl_pixmap.width() - rounded_pixmap.width()) // 2
-                y = (vinyl_pixmap.height() - rounded_pixmap.height()) // 2
-                painter.drawPixmap(x, y, rounded_pixmap)
-                painter.end()
-
-                self.icon_label.setPixmap(self.result_pixmap)
-                self.icon_label.setMinimumSize(0, 0)
-                self.icon_label.setMaximumSize(100000, 100000)
-
-                self.icon_timer.start()
-            else:
-                self.result_pixmap = None
-                self.icon_label.clear()
-                self.icon_label.setFixedSize(0, 0)
-        else:
+        if vinyl_pixmap.isNull():
             self.result_pixmap = None
             self.icon_label.clear()
             self.icon_label.setFixedSize(0, 0)
+            return
+
+        vinyl_pixmap = vinyl_pixmap.scaled(
+            self.icon_size,
+            self.icon_size,
+            Qt.IgnoreAspectRatio,
+            Qt.SmoothTransformation,
+        )
+        self.result_pixmap = QPixmap(vinyl_pixmap.size())
+        self.result_pixmap.fill(Qt.transparent)
+
+        painter = QPainter(self.result_pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.drawPixmap(0, 0, vinyl_pixmap)
+
+        if rounded_pixmap is not None:
+            x = (vinyl_pixmap.width() - rounded_pixmap.width()) // 2
+            y = (vinyl_pixmap.height() - rounded_pixmap.height()) // 2
+            painter.drawPixmap(x, y, rounded_pixmap)
+        painter.end()
+
+        self.icon_label.setPixmap(self.result_pixmap)
+        self.icon_label.setMinimumSize(0, 0)
+        self.icon_label.setMaximumSize(100000, 100000)
+
+        self.icon_timer.start()
 
     def update_content(self):
         self.restart_timer()
