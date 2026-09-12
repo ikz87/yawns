@@ -23,7 +23,7 @@ Yawns is a notification manager (or daemon) written out of the necessity for hig
 A yawn is a window displaying the contents of a notification. So far, the following yawns are available:
 - __Corner yawn__: The most classic notification design. Shows up as a window anchored to one of the corners of your screen. Multiple notifications stack vertically. Ideal for things like e-mail notifications.
 - __Center yawn__: Show a notification in the center of the screen. Multiple notifications stack vertically one behind the other. Meant mostly for displaying quick settings changes like volume, brightness or keyboard layout.
-- __Media yawn__: Like a corner yawn, but this one shows the notification icon as a spinning vinyl disc and doesn't stack, each new yawn replaces the last one (if it's still open). Your Spotify notifications are gonna look amazing with this one.
+- __Media yawn__: Like a corner yawn, but this one shows the notification icon as a spinning vinyl disc, media action buttons (Play/Pause and Prev/Next) and doesn't stack, each new yawn replaces the last one (if it's still open). Your Spotify notifications are gonna look amazing with this one.
 
 When a notification is received, if the hint `yawn_type` is provided (like when running `notify-send hello -h int:yawn_type:1`), the manager will use the specified yawn type to display the notification, following the order from the above list starting from 1.
 
