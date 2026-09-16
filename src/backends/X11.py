@@ -1,8 +1,9 @@
-from PyQt5.QtCore import QThread, pyqtSignal
+from PyQt6.QtCore import QThread, pyqtSignal
+from PyQt6.QtGui import QGuiApplication
 from Xlib import X
 from Xlib.Xatom import ATOM, STRING
+import Xlib.error
 import Xlib.threaded
-from PyQt5.QtX11Extras import QX11Info
 from sys import path
 path.append("../")
 from yawns_notifications import BaseYawn
@@ -139,7 +140,7 @@ def setup_yawn_window(yawn: BaseYawn):
     if urgency_struct:
         yawn.urgency = int(urgency_struct.value)
 
-    if QX11Info.isPlatformX11():
+    if QGuiApplication.platformName() in ("xcb", "x11"):
         # Use the previously open X display connection
         x11_display = yawn.app.display_info["X11_display"]
 

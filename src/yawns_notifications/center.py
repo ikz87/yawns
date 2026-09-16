@@ -72,7 +72,7 @@ class CenterYawn(BaseYawn):
         geo = screen.geometry()
         offset_x = geo.x() + (geo.width() - self_width) // 2
         offset_y = geo.y() + (geo.height() - self_height) // 2
-        self.move(offset_x, offset_y)
+        self.move_to(offset_x, offset_y)
         
         if not self.is_clone:
             for clone in self.clones:

@@ -71,3 +71,15 @@ From this [script](https://github.com/ikz87/dots-2.0/blob/main/Configs/eww/mybar
 
 # Installing
 Either install from the official [AUR package](https://aur.archlinux.org/packages/yawns) or run `install.sh` as root.
+
+## Wayland
+Yawns runs on Wayland compositors that support the wlr-layer-shell protocol
+(sway, Hyprland, niri, river, ...). Positioning, always-on-top behaviour and
+per-notification movement are implemented with layer surfaces instead of
+`move()`, and fullscreen detection uses `zwlr_foreign_toplevel_manager_v1`.
+
+Because Qt does not expose layer-shell through its public API, a small native
+helper (`libyawns_wayland.so`) is compiled from `src/backends/wayland` and
+loaded through ctypes. Building it requires `qt6-base`, `qt6-wayland`,
+`wayland`, `wayland-protocols`, `wayland-scanner` and a C/C++ toolchain.
+`install.sh` builds and installs it automatically; on Xorg it is not needed.

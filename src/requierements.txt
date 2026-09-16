@@ -1,3 +1,10 @@
+# Python packages.
+#
+# The Wayland backend also needs a small native helper (libyawns_wayland.so)
+# that is built from src/backends/wayland at install time. Build dependencies
+# (Arch package names): qt6-base qt6-wayland wayland wayland-protocols base-devel.
+# On Xorg only, the helper and those build deps are not required.
+
 PyQt6
 dbus-next
 yawns-notifications

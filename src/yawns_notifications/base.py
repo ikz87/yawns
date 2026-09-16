@@ -34,11 +34,12 @@ class BaseYawn(QWidget):
         _primary=None,
     ):
         super().__init__(parent)
-        self.setWindowFlags(
-            Qt.WindowType.FramelessWindowHint
-            | Qt.WindowType.WindowStaysOnTopHint
-            | Qt.WindowType.X11BypassWindowManagerHint
-        )
+        flags = Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint
+        if not getattr(app, "is_wayland", False):
+            # X11 only: bypass the window manager. On Wayland the layer surface
+            # handles stacking/placement, so this hint is meaningless there.
+            flags |= Qt.WindowType.X11BypassWindowManagerHint
+        self.setWindowFlags(flags)
         self.yawn_class = type(self).__name__
         
         # Clone logic setup
@@ -116,7 +117,7 @@ class BaseYawn(QWidget):
 
     def _spawn_clones(self):
         """Create clones for all other screens."""
-        if not self._should_clone():
+        if not self._should_clone() or self.clones:
             return
         
         primary_screen = self.get_target_screen()
@@ -513,6 +514,53 @@ class BaseYawn(QWidget):
 
     def next_update_position(self):
         pass
+
+    def move_to(self, x, y):
+        """
+        Position the yawn at absolute global coordinates.
+
+        On X11 this is a plain window move. On Wayland an xdg_toplevel cannot
+        be moved by the client, so the absolute position is translated into
+        layer-shell anchors + margins and applied by the native backend.
+        """
+        if getattr(self.app, "is_wayland", False):
+            self._wayland_set_geometry(x, y)
+        else:
+            self.move(x, y)
+
+    def _wayland_set_geometry(self, x, y):
+        from backends import Wayland as wayland
+
+        pointer = getattr(self, "_wayland_window_ptr", None)
+        if pointer is None:
+            return
+
+        geo = self.get_target_screen().geometry()
+        width, height = self.width(), self.height()
+
+        # Anchor to the nearest screen edges. The surface is then positioned
+        # with margins relative to those edges.
+        left = (x + width / 2.0) < (geo.x() + geo.width() / 2.0)
+        top = (y + height / 2.0) < (geo.y() + geo.height() / 2.0)
+
+        anchor = (wayland.ANCHOR_LEFT if left else wayland.ANCHOR_RIGHT) | (
+            wayland.ANCHOR_TOP if top else wayland.ANCHOR_BOTTOM
+        )
+        margin_top = int(y - geo.y()) if top else 0
+        margin_bottom = int((geo.y() + geo.height()) - (y + height)) if not top else 0
+        margin_left = int(x - geo.x()) if left else 0
+        margin_right = int((geo.x() + geo.width()) - (x + width)) if not left else 0
+
+        wayland.set_geometry(
+            pointer,
+            anchor,
+            margin_top,
+            margin_right,
+            margin_bottom,
+            margin_left,
+            int(width),
+            int(height),
+        )
 
     def mousePressEvent(self, a0):
         super().mousePressEvent(a0)

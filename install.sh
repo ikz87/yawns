@@ -13,6 +13,20 @@ install -Dm755 "$program_dir/src/app.py" "/usr/share/$pkgname/app.py"
 install -Dm644 "$program_dir/src/yawns_manager.py" "/usr/share/$pkgname/yawns_manager.py"
 install -Dm644 "$program_dir/src/gtk_helpers.py" "/usr/share/$pkgname/gtk_helpers.py"
 install -Dm644 "$program_dir/src/backends/X11.py" "/usr/share/$pkgname/backends/X11.py"
+install -Dm644 "$program_dir/src/backends/Wayland.py" "/usr/share/$pkgname/backends/Wayland.py"
+
+# Build and install the native Wayland helper (layer-shell support)
+native_dir="$program_dir/src/backends/wayland"
+if command -v make >/dev/null 2>&1 && pkg-config --exists Qt6WaylandClient; then
+    if make -C "$native_dir"; then
+        install -Dm755 "$native_dir/build/libyawns_wayland.so" \
+            "/usr/lib/$pkgname/backends/wayland/libyawns_wayland.so"
+    else
+        echo "Warning: could not build the Wayland helper; Wayland support disabled."
+    fi
+else
+    echo "Warning: Qt6 Wayland dev files or make not found; skipping Wayland helper."
+fi
 
 # Install yawns_notifications package
 install -d "/usr/share/$pkgname/yawns_notifications"

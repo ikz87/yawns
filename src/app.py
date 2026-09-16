@@ -28,7 +28,8 @@ except ImportError:
 
 
 def detect_compositor():
-    # Placeholder for future implementation
+    # Kept for backwards compatibility; the general layer-shell backend no
+    # longer needs to know which compositor is running.
     return None
 
 
@@ -372,37 +373,21 @@ def load_config(args):
 
 
 def detect_display_server():
-    server = None
-    compositor = None
     if "WAYLAND_DISPLAY" in os.environ:
-        server = "Wayland"
-        compositor = detect_compositor()
-        match compositor:
-            case "sway" | "hyprland":
-                pass
-            case None:
-                print("Compositor not detected")
-            case _:
-                print(f"Compositor: {compositor} is not supported yet.")
-                sys.exit(2)
-        print("Wayland is not supported yet. Exiting...")
-        sys.exit(1)
+        return "Wayland"
 
-    elif "DISPLAY" in os.environ:
+    if "DISPLAY" in os.environ:
         try:
             result = subprocess.run(
                 ["xdpyinfo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE
             )
             if result.returncode == 0:
-                server = "Xorg"
+                return "Xorg"
         except FileNotFoundError:
             pass
 
-    if not server:
-        print("Unable to detect the display server (Xorg or Wayland). Exiting...")
-        sys.exit(1)
-
-    return server
+    print("Unable to detect the display server (Xorg or Wayland). Exiting...")
+    sys.exit(1)
 
 
 if __name__ == "__main__":
@@ -414,29 +399,30 @@ if __name__ == "__main__":
     config, style_path = load_config(args)
     server_type = detect_display_server()
 
-    # Initialize app
-    fullscreen_monitor_thread = None
-    app = None
+    # Initialize the app and the display-server backend
+    fullscreen_monitor = None
+    app = YawnsApp(["yawns"], {"display_server": server_type}, config, style_path)
 
-    if server_type == "Xorg":
+    if app.platformName() == "wayland":
+        from backends import Wayland as wayland_backend
+
+        app.is_wayland = True
+        app.setup_yawn_window = wayland_backend.setup_yawn_window
+        if not wayland_backend.init():
+            print("Warning: layer-shell is unavailable; yawns cannot be shown.")
+        fullscreen_monitor = wayland_backend.FullscreenMonitor()
+    else:
         from backends.X11 import FullscreenMonitor, setup_yawn_window
         from Xlib.display import Display
 
         display = Display()
-        app = YawnsApp(
-            ["yawns"],
-            {"display_server": "Xorg", "X11_display": display},
-            config,
-            style_path,
-        )
+        app.display_info = {"display_server": "Xorg", "X11_display": display}
+        app.is_wayland = False
         app.setup_yawn_window = setup_yawn_window
-        fullscreen_monitor_thread = FullscreenMonitor(display)
-        fullscreen_monitor_thread.fullscreen_active.connect(
-            app.handle_fullscreen_change
-        )
-        fullscreen_monitor_thread.start()
-    else:
-        sys.exit(1)
+        fullscreen_monitor = FullscreenMonitor(display)
+
+    fullscreen_monitor.fullscreen_active.connect(app.handle_fullscreen_change)
+    fullscreen_monitor.start()
 
     app.setQuitOnLastWindowClosed(False)
 

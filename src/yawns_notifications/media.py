@@ -294,7 +294,7 @@ class MediaYawn(BaseYawn):
             rel_x = self.primary.x() - p_geo.x()
             rel_y = self.primary.y() - p_geo.y()
             
-            self.move(m_geo.x() + rel_x, m_geo.y() + rel_y)
+            self.move_to(m_geo.x() + rel_x, m_geo.y() + rel_y)
             return
 
         offset_x = int(self.config.get("x-offset", 40))
@@ -314,7 +314,7 @@ class MediaYawn(BaseYawn):
         else:
             offset_y = geo.y() + offset_y
 
-        self.move(offset_x, offset_y)
+        self.move_to(offset_x, offset_y)
         
         if not self.is_clone:
             for clone in self.clones:

@@ -78,7 +78,7 @@ class CornerYawn(BaseYawn):
             rel_x = self.primary.x() - p_geo.x()
             rel_y = self.primary.y() - p_geo.y()
             
-            self.move(m_geo.x() + rel_x, m_geo.y() + rel_y)
+            self.move_to(m_geo.x() + rel_x, m_geo.y() + rel_y)
             return
 
         offset_x = int(self.config.get("x-offset", -40))
@@ -110,7 +110,7 @@ class CornerYawn(BaseYawn):
                     + gap
                 ) * stacking_direction
 
-        self.move(offset_x, offset_y)
+        self.move_to(offset_x, offset_y)
         
         # After moving, update clones
         if not self.is_clone:
