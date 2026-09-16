@@ -582,9 +582,9 @@ class BaseYawn(QWidget):
                     self.info_dict["notification_id"], 1, self.info_dict["sender_id"]
                 )
 
-        if a0.button() == Qt.LeftButton:
+        if a0.button() == Qt.MouseButton.LeftButton:
             do_actions(self.general_config.get("mouse-left-click", "close"))
-        elif a0.button() == Qt.RightButton:
+        elif a0.button() == Qt.MouseButton.RightButton:
             do_actions(self.general_config.get("mouse-right-click", "close"))
-        elif a0.button() == Qt.MiddleButton:
+        elif a0.button() == Qt.MouseButton.MiddleButton:
             do_actions(self.general_config.get("mouse-middle-click", "close"))
