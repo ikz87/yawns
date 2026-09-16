@@ -1,14 +1,36 @@
+/* =====================================================================
+ * Change your colors here. Every "@name" below can be used anywhere in
+ * this file (e.g. "background-color: @surface;").
+ * This also means you can add your own variables if needed
+ * ===================================================================== */
+
+@accent: #FFE001;                     /* borders, progress bars */
+@background: #24272F;                  /* yawn background */
+@surface: #0F1013;                     /* inner panels and bars */
+@button: #24272F;                      /* buttons */
+@text: #ffffff;                        /* main text */
+@muted: #888888;                       /* secondary text */
+@transparent: rgba(0, 0, 0, 0);
+
+/* ===================================================================== */
+
+/* 
+ * Everything below this point manages the layout of the notifications
+ * have fun :)
+ */
+
+
 * {
-    background-color: rgba(0, 0, 0, 0);
-    color: #ffffff;
+    background-color: @transparent;
+    color: @text;
     font-family: Iosevka Curly;
     font-size: 16px;
 }
 
 #CornerYawn {
-    background-color: rgba(36, 39, 47, 1);
+    background-color: @background;
     border-radius: 20px;
-    border: 5px solid #FFE001;
+    border: 5px solid @accent;
     padding: 10px;
 }
 
@@ -16,17 +38,17 @@
     margin-right: 10px;
     border-radius: 10px;
     padding: 10px;
-    background-color: #0F1013;
+    background-color: @surface;
 }
 
 #CornerYawnTextContainer {
-    background-color: #0F1013;
+    background-color: @surface;
     border-radius: 10px;
     padding: 10px;
 }
 
 #CornerYawnSummary {
-    background-color: rgba(255, 255, 255, 0);
+    background-color: @transparent;
     font-weight: 700;
 }
 
@@ -35,11 +57,11 @@
     border-radius: 10px;
     margin-top: 10px;
     padding: 7.5px;
-    background-color: #0F1013;
+    background-color: @surface;
 }
 
 #CornerYawnButtonsContainer {
-    background-color: #0F1013;
+    background-color: @surface;
     margin-top: 10px;
     border-radius: 10px;
     padding: 5px;
@@ -49,15 +71,15 @@
     border-radius: 5px;
     margin: 5px;
     padding: 5px;
-    background-color: #24272F;
-    border: 2px solid #24272F;
+    background-color: @button;
+    border: 2px solid @button;
 }
 
 #CornerYawnActionButton:hover, #CornerYawnCloseButton:hover {
     border-radius: 5px;
     margin: 5px;
     padding: 5px;
-    border: 2px solid #ffffff;
+    border: 2px solid @text;
 }
 
 #CornerYawnActionButton:pressed, #CornerYawnCloseButton:pressed {
@@ -65,19 +87,19 @@
     margin: 5px;
     padding: 5px;
     margin-top: 7px;
-    border: 2px solid #ffffff;
+    border: 2px solid @text;
     margin-bottom: 3px;
 }
 
 #CornerYawnBar::chunk {
     width: 1px;
-    background-color: #FFE001;
+    background-color: @accent;
 }
 
 #CenterYawn {
-    background-color: rgba(36, 39, 47, 1);
+    background-color: @background;
     border-radius: 20px;
-    border: 5px solid #FFE001;
+    border: 5px solid @accent;
     padding: 10px
 }
 
@@ -86,18 +108,18 @@
 }
 
 #CenterYawnTextContainer {
-    background-color: #0F1013;
+    background-color: @surface;
     border-radius: 10px;
     padding: 10px;
 }
 
 #CenterYawnSummary {
-    background-color: rgba(255, 255, 255, 0);
+    background-color: @transparent;
     font-weight: 700;
 }
 
 #CenterYawnBody {
-    background-color: rgba(255, 255, 255, 0);
+    background-color: @transparent;
 }
 
 #CenterYawnBar {
@@ -105,18 +127,18 @@
     border-radius: 10px;
     margin-top: 6px;
     padding: 7.5px;
-    background-color: #0F1013;
+    background-color: @surface;
 }
 
 #CenterYawnBar::chunk {
     width: 1px;
-    background-color: #FFE001;
+    background-color: @accent;
 }
 
 #MediaYawn {
-    background-color: rgba(36, 39, 47, 1);
+    background-color: @background;
     border-radius: 20px;
-    border: 5px solid #FFE001;
+    border: 5px solid @accent;
     padding: 10px;
 }
 
@@ -124,17 +146,17 @@
     margin-right: 10px;
     border-radius: 10px;
     padding: 10px;
-    background-color: #0F1013;
+    background-color: @surface;
 }
 
 #MediaYawnTextContainer {
-    background-color: #0F1013;
+    background-color: @surface;
     border-radius: 10px;
     padding: 10px;
 }
 
 #MediaYawnSummary {
-    background-color: rgba(255, 255, 255, 0);
+    background-color: @transparent;
     font-weight: 700;
 }
 
@@ -143,11 +165,11 @@
     border-radius: 10px;
     margin-top: 10px;
     padding: 7.5px;
-    background-color: #0F1013;
+    background-color: @surface;
 }
 
 #MediaYawnButtonsContainer {
-    background-color: #0F1013;
+    background-color: @surface;
     margin-top: 10px;
     border-radius: 10px;
     padding: 5px;
@@ -157,15 +179,15 @@
     border-radius: 5px;
     margin: 5px;
     padding: 5px;
-    background-color: #24272F;
-    border: 2px solid #24272F;
+    background-color: @button;
+    border: 2px solid @button;
 }
 
 #MediaYawnActionButton:hover, #MediaYawnCloseButton:hover {
     border-radius: 5px;
     margin: 5px;
     padding: 5px;
-    border: 2px solid #ffffff;
+    border: 2px solid @text;
 }
 
 #MediaYawnActionButton:pressed, #MediaYawnCloseButton:pressed {
@@ -173,20 +195,20 @@
     margin: 5px;
     padding: 5px;
     margin-top: 7px;
-    border: 2px solid #ffffff;
+    border: 2px solid @text;
     margin-bottom: 3px;
 }
 
 #MediaYawnHeader {
     font-size: 13px;
     font-weight: 400;
-    color: #888888;
+    color: @muted;
     margin-bottom: 5px;
     margin-top: 5px;
 }
 
 #MediaYawnControls {
-    background-color: #0F1013;
+    background-color: @surface;
     margin-top: 10px;
     border-radius: 10px;
     padding: 5px;
@@ -196,17 +218,17 @@
     border-radius: 5px;
     margin: 5px;
     padding: 8px 16px;
-    background-color: #24272F;
-    border: 2px solid #24272F;
+    background-color: @button;
+    border: 2px solid @button;
     font-size: 18px;
 }
 
 #MediaYawnControlButton:hover {
-    border: 2px solid #ffffff;
+    border: 2px solid @text;
 }
 
 #MediaYawnControlButton:pressed {
     margin-top: 7px;
     margin-bottom: 3px;
-    border: 2px solid #ffffff;
+    border: 2px solid @text;
 }

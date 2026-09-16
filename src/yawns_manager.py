@@ -4,7 +4,7 @@ from dbus_next.constants import MessageType
 from dbus_next.service import ServiceInterface, method, dbus_property, signal
 from dbus_next.aio import MessageBus
 from dbus_next.message import Message
-from gtk_helpers import find_icon
+from gtk_helpers import find_icon, find_desktop_entry_icon, debug
 from PIL import Image
 import io
 import asyncio
@@ -75,7 +75,12 @@ class NotificationManager(ServiceInterface):
         # Load the image according to the freedesktop specification
         # See here: https://specifications.freedesktop.org/notification-spec/1.2/icons-and-images.html#icons-and-images-formats
         img_byte_arr = None
+        debug(
+            f"Notify: app_name={app_name!r} app_icon={app_icon!r} "
+            f"hints={sorted(hints.keys())}"
+        )
         if "image-data" in hints:
+            debug("Using 'image-data' hint")
             try:
                 img_byte_arr = construct_image(hints["image-data"].value)
             except Exception as e:
@@ -83,6 +88,7 @@ class NotificationManager(ServiceInterface):
 
         elif not img_byte_arr and "image-path" in hints:
             image_path = hints["image-path"].value.replace("file://", "")
+            debug(f"Using 'image-path' hint: {image_path!r}")
             if os.path.exists(image_path):
                 try:
                     with open(image_path, "rb") as img_file:
@@ -92,8 +98,9 @@ class NotificationManager(ServiceInterface):
             else:
                 fd_icon = find_icon(image_path)
                 if fd_icon:
+                    debug(f"Resolved image-path {image_path!r} to {fd_icon!r}")
                     try:
-                        with open(image_path, "rb") as img_file:
+                        with open(fd_icon, "rb") as img_file:
                             img_byte_arr = img_file.read()
                     except Exception as e:
                         print(f"Error opening image file: {e}")
@@ -104,6 +111,7 @@ class NotificationManager(ServiceInterface):
 
         elif not img_byte_arr and app_icon:
             image_path = app_icon.replace("file://", "")
+            debug(f"Using 'app_icon': {image_path!r}")
             if os.path.exists(image_path):
                 try:
                     with open(image_path, "rb") as img_file:
@@ -113,6 +121,7 @@ class NotificationManager(ServiceInterface):
             else:
                 fd_icon = find_icon(image_path)
                 if fd_icon:
+                    debug(f"Resolved app_icon {image_path!r} to {fd_icon!r}")
                     try:
                         with open(fd_icon, "rb") as img_file:
                             img_byte_arr = img_file.read()
@@ -124,10 +133,72 @@ class NotificationManager(ServiceInterface):
                     )
 
         elif not img_byte_arr and "icon_data" in hints:
+            debug("Using 'icon_data' hint")
             try:
                 img_byte_arr = construct_image(hints["icon_data"].value)
             except Exception as e:
                 print(f"Error loading image: {e}")
+
+        # No icon was attached to the notification, fall back to the icon of
+        # the app that sent it. We try, in order:
+        #   1. the "desktop-entry" hint (most reliable when present)
+        #   2. the app name used as a .desktop entry name
+        #   3. the app name used directly as an icon theme name
+        #   4. the lowercased app name as an icon theme name (GTK lookups are
+        #      case-sensitive, e.g. "Spotify" vs the "spotify" icon)
+        if not img_byte_arr:
+            debug("No icon from the notification itself, trying app fallbacks")
+
+            desktop_entry = hints.get("desktop-entry")
+            desktop_entry_name = desktop_entry.value if desktop_entry else None
+            debug(f"'desktop-entry' hint: {desktop_entry_name!r}")
+
+            candidates = []
+            if desktop_entry_name:
+                candidates.append(
+                    (
+                        f"desktop-entry {desktop_entry_name!r}",
+                        lambda: find_desktop_entry_icon(desktop_entry_name),
+                    )
+                )
+            if app_name:
+                candidates.append(
+                    (
+                        f"app_name {app_name!r} as desktop entry",
+                        lambda: find_desktop_entry_icon(app_name),
+                    )
+                )
+                candidates.append(
+                    (
+                        f"app_name {app_name!r} as icon theme",
+                        lambda: find_icon(app_name),
+                    )
+                )
+                if app_name.lower() != app_name:
+                    candidates.append(
+                        (
+                            f"lowercase app_name {app_name.lower()!r} as icon theme",
+                            lambda: find_icon(app_name.lower()),
+                        )
+                    )
+
+            icon_path = None
+            for label, resolve in candidates:
+                icon_path = resolve()
+                debug(f"{label} -> {icon_path!r}")
+                if icon_path:
+                    break
+
+            if icon_path:
+                try:
+                    with open(icon_path, "rb") as img_file:
+                        img_byte_arr = img_file.read()
+                except Exception as e:
+                    print(f"Error opening icon file: {e}")
+            else:
+                debug("No icon found for notification")
+
+        debug(f"Final img_byte_arr: {'<{} bytes>'.format(len(img_byte_arr)) if img_byte_arr else None}")
 
         self.notification_id += 1
         info_dict = {

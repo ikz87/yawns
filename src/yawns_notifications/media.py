@@ -87,22 +87,29 @@ class MediaYawn(BaseYawn):
             show_buttons = self.config.get("show_buttons", "false") == "true"
             self.media_controls_container.setVisible(show_buttons)
 
+    def _set_playing(self, playing):
+        """Sync the play state and the play/pause button icon accordingly."""
+        self.is_playing = playing
+        self.play_pause_button.setText("⏸" if playing else "▶")
+
     def _previous_clicked(self):
         self._send_mpris_command("Previous")
+        # Most players start playing after switching tracks.
+        self._set_playing(True)
         self.restart_timer()
 
     def _play_pause_clicked(self):
         if self.is_playing:
             self._send_mpris_command("Pause")
-            self.play_pause_button.setText("▶")
         else:
             self._send_mpris_command("Play")
-            self.play_pause_button.setText("⏸")
-        self.is_playing = not self.is_playing
+        self._set_playing(not self.is_playing)
         self.restart_timer()
 
     def _next_clicked(self):
         self._send_mpris_command("Next")
+        # Most players start playing after switching tracks.
+        self._set_playing(True)
         self.restart_timer()
 
     def setup_media_controls(self):

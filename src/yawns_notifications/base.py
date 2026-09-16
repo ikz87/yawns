@@ -329,7 +329,7 @@ class BaseYawn(QWidget):
                 action_text = actions[action_index]
                 action = actions[action_index - 1]
                 action_button = QPushButton(action_text)
-                action_button.setCursor(Qt.PointingHandCursor)
+                action_button.setCursor(Qt.CursorShape.PointingHandCursor)
                 action_button.setObjectName(self.yawn_class + "ActionButton")
                 action_button.clicked.connect(
                     lambda _, act=action: self.action_clicked(act)
@@ -337,7 +337,7 @@ class BaseYawn(QWidget):
                 self.buttons_layout.addWidget(action_button)
             close_button = QPushButton("Close")
             close_button.setObjectName(self.yawn_class + "CloseButton")
-            close_button.setCursor(Qt.PointingHandCursor)
+            close_button.setCursor(Qt.CursorShape.PointingHandCursor)
             close_button.clicked.connect(
                 lambda: (
                     self.app.request_notification_closing.emit(

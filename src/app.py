@@ -2,6 +2,7 @@ import sys
 import configparser
 import signal
 import os
+import re
 import subprocess
 import fnmatch
 import argparse
@@ -107,6 +108,52 @@ class NotificationManagerThread(QThread):
         self.quit()
 
 
+def load_stylesheet(style_path):
+    """
+    Read the QSS file, resolve the user-friendly variable definitions placed at
+    the top of the file (e.g. "@accent: #FFE001;") and return the resulting
+    stylesheet ready to be handed to Qt.
+
+    A variable definition is a line of the form "@name: value;" (the leading
+    "@" distinguishes it from any real QSS rule). Variables can reference other
+    variables and are substituted wherever "@name" appears in the rest of the
+    file.
+    """
+    text = Path(style_path).read_text()
+
+    variables = {}
+    kept_lines = []
+    for line in text.splitlines():
+        match = re.match(
+            r"\s*@([\w-]+)\s*:\s*(.+?)\s*;\s*(?:/\*.*?\*/\s*)?$", line
+        )
+        if match:
+            variables[match.group(1)] = match.group(2)
+        else:
+            kept_lines.append(line)
+    text = "\n".join(kept_lines)
+
+    if not variables:
+        return text
+
+    def resolve(value, depth=0):
+        if depth > 10:
+            return value
+        return re.sub(
+            r"@([\w-]+)",
+            lambda m: resolve(variables[m.group(1)], depth + 1)
+            if m.group(1) in variables
+            else m.group(0),
+            value,
+        )
+
+    resolved = {name: resolve(value) for name, value in variables.items()}
+
+    return re.sub(
+        r"@([\w-]+)", lambda m: resolved.get(m.group(1), m.group(0)), text
+    )
+
+
 class YawnsApp(QApplication):
     request_notification_closing = pyqtSignal(int, int, str)
     request_notification_action = pyqtSignal(int, str, str)
@@ -118,7 +165,7 @@ class YawnsApp(QApplication):
 
         # Load stylesheet
         try:
-            self.stylesheet = Path(style_path).read_text()
+            self.stylesheet = load_stylesheet(style_path)
             self.setStyleSheet(self.stylesheet)
         except Exception as e:
             print(f"Error reading stylesheet: {e}")
